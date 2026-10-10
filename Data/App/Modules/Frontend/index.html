@@ -112,6 +112,19 @@
         <div data-complex="plot" class="complexPlot"></div>
         <div class="complexTableWrap"><table class="complexTable"><thead><tr><th>A 候选阶段</th><th>A 自然区间／速度</th><th>输入与衔接</th><th>B 对应阶段</th><th>共同区间 A−B</th><th>起卡位置偏移</th><th>证据</th></tr></thead><tbody data-complex="rows"></tbody></table></div>
         <details><summary>原始输入与采样证据</summary><div data-complex="evidence" class="complexEvidence">点击阶段的证据按钮。</div></details>
+        <details class="complexReferences"><summary>多份参考与操作建议</summary>
+          <p class="subtle">选择同图参考录像，可逐份指定流、圈次及练习区域。系统不验证职业身份；参考角色由你选择。最多8份，按策略和空间对应筛选后汇总。</p>
+          <div class="complexControls"><select data-complex="reference-choice" aria-label="选择参考录像"></select><button class="btn" data-complex="add-reference">添加参考</button><button class="btn" data-complex="add-baseline">加入当前 B</button></div>
+          <div data-complex="references"></div>
+          <div class="complexDeclarations">
+            <label><input type="checkbox" data-complex="reviewed"> 已在游戏回放核对所选区域的合并前进、漂移输入及候选阶段</label>
+            <label><input type="checkbox" data-complex="same-car"> A 与这些参考的赛车性能配置一致</label>
+            <label>配置依据 <input data-complex="car-note" placeholder="记录赛车、性能配置与核对来源"></label>
+            <label><input type="checkbox" data-complex="same-strategy"> 已核对所选区域使用相同的连卡／后续漂移策略</label>
+          </div>
+          <button class="btn primary" data-complex="run-references">分析参考组</button>
+          <div data-complex="guidance" role="status">尚未分析参考组；条件未确认时仍可查看测量分布。</div>
+        </details>
         <p class="subtle">速度显示为游戏码；原始 JSON 使用 m/s。停留数是录像采样数，时间用实际时间戳。共同区间可能重叠，不能把逐行时间差相加；自然持续时间差不等于快慢收益。</p>
       </details>
       <div class="workspace">

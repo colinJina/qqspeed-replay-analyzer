@@ -22,9 +22,12 @@ Require ($a.actions.stages[0].bridge.forward_holds[0].samples-eq30) 'Forward bri
 $pulse=$a.actions.stages[0].drift_pulses[0]
 Require (Approx $pulse.duration_lower_s .2) 'Hold lower duration ignores observed timestamps.'
 Require (Approx $pulse.duration_upper_s .3) 'Hold upper duration must include surrounding released samples.'
+Require (Approx $a.actions.stages[0].release_to_drift_lower_s (-.05)) 'Same-sample input changes cannot establish sub-sample ordering.'
+Require (Approx $a.actions.stages[0].release_to_drift_upper_s .05) 'Onset ordering uncertainty must retain both sample intervals.'
 Require ($a.actions.stages[0].map_propulsion_samples-eq21) 'Native map propulsion evidence lost.'
 $ab=NCA-BuildComparison $a $b;$ba=NCA-BuildComparison $b $a
 Require ($ab.matches.Count-eq4-and$ba.matches.Count-eq4) 'Unique stages did not match.'
+Require (Approx $ab.chains[0].common_time_delta_s (-$ba.chains[0].common_time_delta_s)) 'Shared chain timing must include bridges and negate on swap.'
 for($i=0;$i-lt4;$i++){
     Require (Approx $ab.matches[$i].common_time_delta_s (-$ba.matches[$i].common_time_delta_s)) 'Common-space delta does not negate on swap.'
     Require (Approx $ab.matches[$i].onset_equivalent_offset_s .25) 'Absolute prefix delay leaked into onset guidance.'

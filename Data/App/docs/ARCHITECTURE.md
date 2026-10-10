@@ -360,3 +360,29 @@ Pre-release development rebuilds may destructively rebuild derived outputs. Raw 
 ### Input timeline stage 1
 
 The qpf_v2 transport uses QQPFAST2/version 2, eight UInt16 input cells, and a 114-byte row. Values 0..255 are preserved; 65535 means absent, so a raw 255 is no longer lost. Old six-channel descriptors and binaries fail validation and rebuild from the source. Logical merging preserves equal-time boundary records. The complete CSV timeline publishes raw offsets 60..67 and a nullable candidate binary OR of 62/67. Other input labels and the combined game-state interpretation remain unverified candidates. Playback never selects a future nearest sample; individual equal-time records remain seekable. This stage adds no cardrift or coaching authority.
+# Fork extension: complete input and complex actions
+
+The independent fork adds a derived layer without changing the authority of native Drift or
+speed-effect facts. The complete logical CSV preserves all eight raw input candidates (60..67).
+`replay_input_timeline_v1` uses nullable OR of 62/67 for the forward-related candidate; it never
+assigns fixed physical W/8 keys or treats missing data as released.
+
+`NativeComplexActions.ps1` produces `sav_complex_actions_v1` from full samples. Candidate phases,
+natural boundaries, input hold bounds and pose-derived full heading angles remain reviewable
+observations. `NativeComplexComparison.ps1` reuses the bounded NTA spatial kernel, without time in
+its matching cost. It pairs unique nearby stages and measures common-space time separately from
+natural duration. An onset offset maps the reference position onto the current side's own time.
+
+`NativeReferenceGuidance.ps1` aggregates compatible replay/lap references under
+`reference_guidance_v1`. Vehicle/input/strategy confirmations are user declarations. No native
+state is overwritten by advice. Duplicates, ambiguity, divergent strategies, low resolution and
+incomparable entry states suppress numerical trials while preserving observations and evidence.
+
+The frontend loads `/js/complex-actions.js` and calls `/api/complex-action-comparison` and
+`/api/complex-action-batch` only for requested analysis. No derived computation occurs in animation
+frames. Process caches retain up to ten sides and twelve directed comparisons with source length
+and UTC modification-time invalidation. The UI precomputes references one request at a time before
+aggregation; direct batch requests are bounded to eight references and remain synchronous.
+
+See `stages/0001-input-timeline.md`, `stages/0002-complex-action-comparison.md` and
+`stages/0003-reference-guidance.md` for implemented fields, validation and remaining boundaries.

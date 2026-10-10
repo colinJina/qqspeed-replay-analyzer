@@ -6,6 +6,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $AppDir 'Modules\Frontend\Frontend.Http.ps1')
 . (Join-Path $AppDir 'Modules\Frontend\Frontend.InputTimeline.ps1')
 . (Join-Path $AppDir 'Modules\Frontend\Frontend.ComplexActions.ps1')
+. (Join-Path $AppDir 'Modules\Native\NativeReferenceGuidance.ps1')
 $tempBase=[IO.Path]::GetFullPath([IO.Path]::GetTempPath());$root=Join-Path $tempBase ('QQReplayComplex_'+[Guid]::NewGuid().ToString('N'))
 $outputDir=Join-Path $root 'Output';$dataDir=Join-Path $root 'Data';$dir=Join-Path $dataDir 'Telemetry\sample'
 try {
@@ -27,14 +28,15 @@ try {
     Require (-not[object]::ReferenceEquals($again,(Get-ComplexActionSide $select))) 'Cache signature did not invalidate after CSV changed.'
     $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $AppDir 'QQReplayFrontend.ps1'),[ref]$null,[ref]$null)
     foreach($name in @('Invoke-FrontendRouter','Send-FrontendAsset')){$f=$ast.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-eq$name},$true);. ([scriptblock]::Create($f.Extent.Text))}
-    foreach($route in @('/api/complex-action-comparison','/js/complex-actions.js')){
+    foreach($route in @('/api/complex-action-comparison','/api/complex-action-batch','/js/complex-actions.js')){
         $memory=New-Object IO.MemoryStream
         try {
-            $body=[Text.Encoding]::UTF8.GetBytes((@{subject=$select;baseline=$select}|ConvertTo-Json -Depth 8))
+            $body=[Text.Encoding]::UTF8.GetBytes((@{subject=$select;baseline=$select;references=@($select);declarations=@{}}|ConvertTo-Json -Depth 8))
             $method=$(if($route.StartsWith('/api/')){'POST'}else{'GET'})
             Invoke-FrontendRouter $memory ([pscustomobject]@{Line=($method+' '+$route+' HTTP/1.1');Headers=@{};Body=$body}) '' (Join-Path $AppDir 'Modules\Frontend') $root
             $wire=[Text.Encoding]::UTF8.GetString($memory.ToArray());Require ($wire.StartsWith('HTTP/1.1 200')) ('Actual route failed: '+$route)
             if($method-eq'POST'){$json=($wire-split"`r`n`r`n",2)[1]|ConvertFrom-Json;Require ($json.subject.stages.Count-eq4) 'Wire lost stage observations.'}
+            if($route-eq'/api/complex-action-batch'){Require ($json.guidance.accepted_reference_count-eq0-and$json.guidance.rejected_references[0].reason-eq'subject_cannot_reference_itself') 'Batch wire silently used A as its own reference.'}
         } finally {$memory.Dispose()}
     }
     $bad=$false;try {Invoke-ComplexActionComparisonLocal @{subject=@{file='sample.json';stream='local';lap=0}}|Out-Null}catch{$bad=$true};Require $bad 'Invalid lap accepted.'

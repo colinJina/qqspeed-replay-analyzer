@@ -43,6 +43,7 @@ const inputTimeline=window.ReplayInputTimeline?window.ReplayInputTimeline.create
 }):{sync(){},reset(){}};
 const complexActions=window.ReplayComplexActions?window.ReplayComplexActions.create({
   panel:$('complexActionsPanel'),post,
+  loadMetadata:file=>json('/api/telemetry?file='+encodeURIComponent(file),{cache:'no-store'}),
   loadTimeline:s=>json('/api/input-timeline?file='+encodeURIComponent(s.file)+'&stream='+encodeURIComponent(s.stream)+'&lap='+encodeURIComponent(s.lap),{cache:'no-store'}),
   seek:t=>inputTimeline.seekTime(t),speed:v=>String(gameSpeedDisplay(v))+' 码'
 }):{sync(){},reset(){}};
@@ -866,7 +867,7 @@ function getReferenceTrack(){return ensureViewModel().referenceTrack}
 function redrawCanvas(){const vm=ensureViewModel();drawRoute(vm.referenceTrack,vm.subjectTrack)}
 function renderAll(){
   inputTimeline.sync({file:currentFile,stream:stream?.id,lap:currentLap,revision:analysisRevision});
-  complexActions.sync({subject:currentFile&&stream&&currentLap?{file:currentFile,stream:stream.id,lap:Number(currentLap)}:null,baseline:compareFile&&referenceStream()&&compareLap?{file:compareFile,stream:referenceStream().id,lap:Number(compareLap)}:null,revision:analysisRevision});
+  complexActions.sync({subject:currentFile&&stream&&currentLap?{file:currentFile,stream:stream.id,lap:Number(currentLap)}:null,baseline:compareFile&&referenceStream()&&compareLap?{file:compareFile,stream:referenceStream().id,lap:Number(compareLap)}:null,choices:records.filter(r=>sameMapCompatible(currentRecord(),r)).map(r=>({file:r.file,label:compactReplayLabel(r)||r.file})),revision:analysisRevision});
   fitMapViewportHeight();
   const vm=ensureViewModel();
   const subjectTrack=vm.subjectTrack,referenceTrack=vm.referenceTrack;

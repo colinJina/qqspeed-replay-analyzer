@@ -40,6 +40,7 @@ New-Item -ItemType Directory -Force -Path $outputDir,$dataDir,$tempUploadRoot,$r
 . (Join-Path $appDir 'Modules\Native\NativeSegmentComparison.ps1')
 . (Join-Path $appDir 'Modules\Native\NativeComplexActions.ps1')
 . (Join-Path $appDir 'Modules\Native\NativeComplexComparison.ps1')
+. (Join-Path $appDir 'Modules\Native\NativeReferenceGuidance.ps1')
 . (Join-Path $appDir 'Modules\Frontend\Frontend.ComplexActions.ps1')
 
 # Clean-install bootstrap is asynchronous: selecting the game directory is the only required setup.
@@ -191,6 +192,8 @@ function Invoke-FrontendRouter($Stream,$Request,$Html,$FrontendDir,$Root) {
             try{$req=[Text.Encoding]::UTF8.GetString($bodyBytes)|ConvertFrom-Json;$mid=[int]$req.map_id;$result=Invoke-MapRebuild $mid;Send-Text $Stream $(if($result.ok){200}else{500}) 'application/json; charset=utf-8' (Json-Text $result 6)}catch{$err=[ordered]@{ok=$false;error=$_.Exception.Message;log_tail=@()};Send-Text $Stream 500 'application/json; charset=utf-8' (Json-Text $err 4)}
         } elseif($path-eq'/api/refresh-data-start') {
             try{$result=Start-RefreshDataTask;Send-Text $Stream 200 'application/json; charset=utf-8' (Json-Text $result 4)}catch{Send-Text $Stream 500 'application/json; charset=utf-8' (Json-Text ([ordered]@{ok=$false;error=$_.Exception.Message}) 3)}
+        } elseif($path-eq'/api/complex-action-batch') {
+            try{$req=[Text.Encoding]::UTF8.GetString($bodyBytes)|ConvertFrom-Json;$result=Invoke-ComplexActionBatchLocal $req;Send-Text $Stream 200 'application/json; charset=utf-8' (Json-Text $result 16)}catch{Send-Text $Stream 400 'application/json; charset=utf-8' (Json-Text @{ok=$false;error=$_.Exception.Message} 3)}
         } elseif($path-eq'/api/complex-action-comparison') {
             try{$req=[Text.Encoding]::UTF8.GetString($bodyBytes)|ConvertFrom-Json;$result=Invoke-ComplexActionComparisonLocal $req;Send-Text $Stream 200 'application/json; charset=utf-8' (Json-Text $result 16)}catch{Send-Text $Stream 400 'application/json; charset=utf-8' (Json-Text @{ok=$false;error=$_.Exception.Message} 3)}
         } elseif($path-eq'/api/segment-comparison') {

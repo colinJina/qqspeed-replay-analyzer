@@ -28,7 +28,7 @@ function NCA-MappingQuality($Component,[double]$S) {
 }
 function NCA-BuildComparison($SideA,$SideB) {
     $gate=NSC-IdentityGate $SideA $SideB
-    $result=[ordered]@{contract='sav_complex_comparison_v1';identity=$gate;status='unavailable';time_basis='A minus B over the same mapped spatial interval; natural durations are separate; overlapping windows are not additive';matches=@();unmatched_a=@();unmatched_b=@();shared_chain=$null;alignment=$null}
+    $result=[ordered]@{contract='sav_complex_comparison_v1';identity=$gate;status='unavailable';time_basis='A minus B over the same mapped spatial interval; natural durations are separate; overlapping windows are not additive';matches=@();unmatched_a=@();unmatched_b=@();chains=@();alignment=$null}
     if(-not$gate.comparable){$result.status=$gate.status;return [pscustomobject]$result}
     # Canonical alignment makes swapping A/B preserve geometry and negate signed time metrics.
     $swapped=([string]$SideA.key).CompareTo([string]$SideB.key)-gt0
@@ -85,6 +85,17 @@ function NCA-BuildComparison($SideA,$SideB) {
         $usedA[[string]$x.stage.id]=$true;$usedB[[string]$y.stage.id]=$true;$lastB=$y.stage.id
     }
     $result.matches=@($matches.ToArray())
+    $groups=@{}
+    foreach($m in $matches){$key=[string]$m.a.chain+':'+[string]$m.b.chain+':'+[string]$m.shared_component;if(-not$groups.ContainsKey($key)){$groups[$key]=@()};$groups[$key]+=,$m}
+    $chains=@()
+    foreach($groupKey in @($groups.Keys|Sort-Object)){
+        $group=@($groups[$groupKey]);$first=$group[0]
+        $s0=($group|Measure-Object shared_start_s -Minimum).Minimum;$s1=($group|Measure-Object shared_end_s -Maximum).Maximum
+        $start=NCA-SharedPoint $components[$first.shared_component] $s0 $a.actions.rows $b.actions.rows;$end=NCA-SharedPoint $components[$first.shared_component] $s1 $a.actions.rows $b.actions.rows
+        $timeA=$null;$timeB=$null
+        if($null-ne$start-and$null-ne$end){$timeA=$end.a.t-$start.a.t;$timeB=$end.b.t-$start.b.t}
+        $chains+=,[pscustomobject]@{a_chain=$first.a.chain;b_chain=$first.b.chain;matched_stages=$group.Count;a_stage_ids=@($group|ForEach-Object{$_.a_stage_id});b_stage_ids=@($group|ForEach-Object{$_.b_stage_id});shared_component=$first.shared_component;common_a_duration_s=$(if($swapped){$timeB}else{$timeA});common_b_duration_s=$(if($swapped){$timeA}else{$timeB});common_time_delta_s=$(if($null-eq$timeA-or$null-eq$timeB){$null}elseif($swapped){$timeB-$timeA}else{$timeA-$timeB});covers_complete_a_chain=(@($SideA.actions.stages|Where-Object{$_.chain-eq$first.a.chain}).Count-eq$group.Count);covers_complete_b_chain=(@($SideB.actions.stages|Where-Object{$_.chain-eq$first.b.chain}).Count-eq$group.Count)}
+    };$result.chains=$chains
     $unA=@($a.actions.stages|Where-Object{-not$usedA.ContainsKey([string]$_.id)}|ForEach-Object{[pscustomobject]@{stage_id=$_.id;reason='no_unique_ordered_spatial_match'}})
     $unB=@($b.actions.stages|Where-Object{-not$usedB.ContainsKey([string]$_.id)}|ForEach-Object{[pscustomobject]@{stage_id=$_.id;reason='no_unique_ordered_spatial_match'}})
     $result.unmatched_a=$(if($swapped){$unB}else{$unA});$result.unmatched_b=$(if($swapped){$unA}else{$unB})

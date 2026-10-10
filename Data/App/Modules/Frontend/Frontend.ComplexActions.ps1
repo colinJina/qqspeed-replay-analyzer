@@ -21,7 +21,7 @@ function Get-ComplexActionSide($Selection) {
     }
     $mapName=$(if($analysis.map_name){[string]$analysis.map_name}else{Analysis-MapName $analysis})
     $side=[pscustomobject]@{key=([string]$tel.source_sha256+':'+$name+':'+[string]$s.id+':'+$lap);signature=$cacheKey;file=$name;stream=[string]$s.id;role=[string]$s.role;lap=$lap;resource_map_id=$(if($null-ne$analysis.resource_map_id){$analysis.resource_map_id}else{$analysis.map_id});game_map_id=$analysis.game_map_id;map_name=$mapName;map_name_key=(Comparison-MapNameKey $mapName);source_sha256=$tel.source_sha256;requires_reanalysis=$timeline.requires_reanalysis;actions=$actions}
-    if($script:complexSideCache.Count-ge6){$script:complexSideCache=@{}};$script:complexSideCache[$cacheKey]=$side
+    if($script:complexSideCache.Count-ge10){$script:complexSideCache=@{}};$script:complexSideCache[$cacheKey]=$side
     return $side
 }
 function Get-ComplexComparisonCached($A,$B) {
@@ -39,4 +39,15 @@ function Invoke-ComplexActionComparisonLocal($Req) {
     $a=Get-ComplexActionSide $Req.subject;$b=$null;$comparison=$null
     if($null-ne$Req.baseline){$b=Get-ComplexActionSide $Req.baseline;$comparison=Get-ComplexComparisonCached $a $b}
     return [ordered]@{ok=$true;subject=(Get-ComplexActionPublic $a);baseline=$(if($null-ne$b){Get-ComplexActionPublic $b}else{$null});comparison=$comparison}
+}
+function Invoke-ComplexActionBatchLocal($Req) {
+    $choices=@($Req.references)
+    if($choices.Count-lt1-or$choices.Count-gt8){throw 'Choose between one and eight reference replay/lap selections.'}
+    $a=Get-ComplexActionSide $Req.subject;$references=@()
+    foreach($choice in $choices){
+        try {$b=Get-ComplexActionSide $choice;$references+=,[pscustomobject]@{side=$b;comparison=(Get-ComplexComparisonCached $a $b)}}
+        catch {$references+=,[pscustomobject]@{file=[string]$choice.file;error=$_.Exception.Message}}
+    }
+    $guidance=NRG-Build $a $references $Req.declarations
+    return [ordered]@{ok=$true;subject=(Get-ComplexActionPublic $a);guidance=$guidance;comparisons=@($references|Where-Object{$null-eq$_.error}|ForEach-Object{[pscustomobject]@{file=$_.side.file;stream=$_.side.stream;lap=$_.side.lap;source_sha256=$_.side.source_sha256;comparison=$_.comparison}})}
 }
