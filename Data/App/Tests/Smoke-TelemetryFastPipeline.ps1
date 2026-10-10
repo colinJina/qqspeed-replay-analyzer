@@ -24,7 +24,7 @@ try {
         Put-F32 $bytes ($b+8) 0;Put-F32 $bytes ($b+12) 0;Put-F32 $bytes ($b+16) 0;Put-F32 $bytes ($b+20) 1
         Put-F32 $bytes ($b+24) ([single]($i*0.20));Put-F32 $bytes ($b+28) ([single]([Math]::Sin($i/30.0)*2.0));Put-F32 $bytes ($b+32) 0
         Put-I32 $bytes ($b+52) 5
-        for($c=0;$c-lt6;$c++){$bytes[$b+60+$c]=[byte]$(if((($i+$c)%23)-lt4){1}else{0})}
+        for($c=0;$c-lt8;$c++){$bytes[$b+60+$c]=[byte]$(if((($i+$c)%23)-lt4){1}else{0})}
         Put-I32 $bytes ($b+76) $(if($i-lt120){1}else{2})
         Put-F32 $bytes ($b+173) 11.765;Put-F32 $bytes ($b+177) 0;Put-F32 $bytes ($b+181) 0
     }
@@ -37,16 +37,16 @@ try {
     $m=Get-Content -LiteralPath (Join-Path $directOut 'manifest.json') -Raw -Encoding UTF8|ConvertFrom-Json
     $rep=@($m.replays)[0];$stream=@($rep.streams|Where-Object{[bool]$_.primary_by_record_count}|Select-Object -First 1)[0]
     Require ($null-ne$stream) 'Fast extractor did not return a primary stream.'
-    Require ([string]$stream.physical_transport -eq 'qpf_v1') 'Fast extractor physical transport is not qpf_v1.'
+    Require ([string]$stream.physical_transport -eq 'qpf_v2') 'Fast extractor physical transport is not qpf_v2.'
     Require (-not[string]::IsNullOrWhiteSpace([string]$stream.fastbin)) 'Fast extractor did not emit a qpf path.'
     Require ($null-eq$stream.csv -or [string]::IsNullOrWhiteSpace([string]$stream.csv)) 'Fast extractor unexpectedly wrote compatibility physical CSV.'
     $qpf=Join-Path $directOut ([string]$stream.fastbin).Replace('/','\')
-    Require ([QQReplayPortable]::ValidateFastBin($qpf)) 'qpf_v1 structural validation failed.'
+    Require ([QQReplayPortable]::ValidateFastBin($qpf)) 'qpf_v2 structural validation failed.'
     $fast=[QQReplayPortable]::LoadFastRows($qpf,[string]$stream.profile,[string]$stream.stream_id)
-    Require ($fast.Count-ge200) ('qpf_v1 row count unexpectedly low: '+$fast.Count)
-    Require ([string]$fast[0].speed_source -eq 'replay_linear_velocity') 'qpf_v1 lost authoritative 2026 replay linear velocity.'
-    Require ($null-ne$fast[0].contact_state -and [int]$fast[0].contact_state-eq5) 'qpf_v1 lost contact_state.'
-    Require ($null-ne$fast[150].lap_index -and [int]$fast[150].lap_index-eq2) 'qpf_v1 lost lap_index.'
+    Require ($fast.Count-ge200) ('qpf_v2 row count unexpectedly low: '+$fast.Count)
+    Require ([string]$fast[0].speed_source -eq 'replay_linear_velocity') 'qpf_v2 lost authoritative 2026 replay linear velocity.'
+    Require ($null-ne$fast[0].contact_state -and [int]$fast[0].contact_state-eq5) 'qpf_v2 lost contact_state.'
+    Require ($null-ne$fast[150].lap_index -and [int]$fast[150].lap_index-eq2) 'qpf_v2 lost lap_index.'
     $fast[0].distance=1.25;$fast[0].system_drift_state=$false;$fast[0].system_drift_state_source='smoke';$fast[0].nitro_active=$true
     $logicalProbe=Join-Path $temp 'logical_probe.csv'
     [QQReplayPortable]::WriteLogicalCsv($logicalProbe,$fast)
@@ -61,7 +61,7 @@ try {
     $s1=Get-Content -LiteralPath (Join-Path $telemetryOut 'telemetry_summary.json') -Raw -Encoding UTF8|ConvertFrom-Json
     $p1=Get-Content -LiteralPath (Join-Path $telemetryOut 'pipeline_profile.json') -Raw -Encoding UTF8|ConvertFrom-Json
     $e1=Get-Content -LiteralPath (Join-Path $telemetryOut 'native_action_evidence_summary.json') -Raw -Encoding UTF8|ConvertFrom-Json
-    Require ([string]$s1.physical_transport_contract-eq'qpf_v1') 'Telemetry summary qpf_v1 contract missing.'
+    Require ([string]$s1.physical_transport_contract-eq'qpf_v2') 'Telemetry summary qpf_v2 contract missing.'
     Require ([string]$s1.physical_cache_mode-eq'rebuilt') 'First telemetry run must rebuild physical cache.'
     Require ([string]$p1.contract-eq'telemetry_pipeline_profile_v1') 'Pipeline profile contract missing.'
     Require ([string]$e1.contract-eq'native_action_evidence_summary_v1') 'Compact native-action evidence contract missing.'
@@ -83,7 +83,19 @@ try {
     Require ($hash2-eq$hash1) 'Reused qpf cache content changed unexpectedly.'
     Require ($ticks2-eq$ticks1) 'Reused qpf cache was rewritten unexpectedly.'
 
-    Write-Host ('[OK] Telemetry Fast Pipeline v1 smoke passed. transport=qpf_v1 rows='+$fast.Count+' first='+[string]$p1.total_ms+'ms second='+[string]$p2.total_ms+'ms cache=reused evidence=ready')
+    # A pre-input8 descriptor must rebuild from SAV, without a manual cache purge.
+    $descriptorPath=Join-Path $physicalCache 'source_cache.json'
+    $descriptor=Get-Content -LiteralPath $descriptorPath -Raw|ConvertFrom-Json
+    $descriptor.contract='qpf_v2_nondec_ts_2026schema1_fastpipe1'
+    $descriptor|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $descriptorPath -Encoding UTF8
+    & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $tele -ReplayPath $sav -OutDir $telemetryOut -ReplaySha256 $sha -PhysicalCacheDir $physicalCache -Force
+    Require ($LASTEXITCODE-eq0) 'Legacy physical descriptor migration failed.'
+    $migrated=Get-Content -LiteralPath (Join-Path $telemetryOut 'telemetry_summary.json') -Raw|ConvertFrom-Json
+    Require ([string]$migrated.physical_cache_mode-eq'rebuilt') 'Old input cache was reused.'
+    $migratedRows=@(Import-Csv -LiteralPath (Join-Path $telemetryOut $migrated.streams[0].csv))
+    Require ($migratedRows[0].PSObject.Properties.Name-contains'input_bool_candidate_67') 'Migrated logical CSV lost channel 67.'
+
+    Write-Host ('[OK] Telemetry Fast Pipeline v1 smoke passed. transport=qpf_v2 rows='+$fast.Count+' first='+[string]$p1.total_ms+'ms second='+[string]$p2.total_ms+'ms cache=reused evidence=ready')
     exit 0
 }catch{
     Write-Host ('[FAILED] '+$_.Exception.Message)

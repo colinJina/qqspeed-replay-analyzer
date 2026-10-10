@@ -34,6 +34,13 @@ let viewModel=null,viewKey='',viewRevision=0,analysisRevision=0;
 let inspectorPos={x:10,y:10},inspectorDrag=null,inspectorUserMoved=false,inspectorCollapsed=false; // product default: expanded on every frontend start
 let replayRailCollapsed=false;
 let systemStatus=null,bootstrapPollTaskId='',bootstrapPollPromise=null;
+let inputTimelineSample=null;
+const inputTimeline=window.ReplayInputTimeline?window.ReplayInputTimeline.create({
+  panel:$('inputTimelinePanel'),
+  load:s=>json('/api/input-timeline?file='+encodeURIComponent(s.file)+'&stream='+encodeURIComponent(s.stream)+'&lap='+encodeURIComponent(s.lap),{cache:'no-store'}),
+  formatSpeed:v=>String(gameSpeedDisplay(v))+' 码',
+  onSample:row=>{inputTimelineSample=row;if(analysis)redrawCanvas()}
+}):{sync(){},reset(){}};
 
 function fitMapViewportHeight(){
   const wrap=$('mapWrap');if(!wrap)return false;
@@ -151,7 +158,7 @@ async function loadList(keep=''){
   $('count').textContent=records.length;
   renderList();
   const target=keep&&records.some(r=>r.file===keep)?keep:(records[0]?.file||'');
-  if(target)await openRecord(target);else{$('content').classList.add('hidden');$('empty').classList.remove('hidden')}
+  if(target)await openRecord(target);else{inputTimeline.reset();$('content').classList.add('hidden');$('empty').classList.remove('hidden')}
 }
 function renderList(){
   const q=$('search').value.trim().toLowerCase(),box=$('list');box.innerHTML='';
@@ -749,6 +756,7 @@ async function syncCurrentLapToCompare(){
   await rebuildCompareLapOptions();
 }
 async function openRecord(file){
+  inputTimeline.reset();
   currentFile=file;renderList();$('empty').classList.add('hidden');$('content').classList.remove('hidden');
   [analysis,telemetry]=await Promise.all([loadAnalysis(file),loadTelemetry(file)]);stream=localStream(telemetry);
   analysisRevision++;invalidateViewModel();
@@ -851,6 +859,7 @@ function getSubjectTrack(){return ensureViewModel().subjectTrack}
 function getReferenceTrack(){return ensureViewModel().referenceTrack}
 function redrawCanvas(){const vm=ensureViewModel();drawRoute(vm.referenceTrack,vm.subjectTrack)}
 function renderAll(){
+  inputTimeline.sync({file:currentFile,stream:stream?.id,lap:currentLap,revision:analysisRevision});
   fitMapViewportHeight();
   const vm=ensureViewModel();
   const subjectTrack=vm.subjectTrack,referenceTrack=vm.referenceTrack;
@@ -977,6 +986,9 @@ function drawRoute(referenceTrack,subjectTrack){
     for(const row of markerRows){const s=row.s;if(s.delta==null)continue;const dv=timeDeltaView(s.delta,s.subjectEndpointApprox||s.referenceEndpointApprox),tangent=screenTangentAt(subjectTrack,s.centerS,project),place=chooseSectorLabel(x,row.q,dv.marker,w,h,occupied,routePoints,tangent);if(!place)continue;
       x.save();x.textAlign='center';x.textBaseline='middle';x.font='700 11px system-ui,sans-serif';x.lineJoin='round';x.strokeStyle='rgba(255,255,255,.96)';x.lineWidth=4;x.strokeText(dv.marker,place.x,place.y);x.fillStyle=row.col;x.fillText(dv.marker,place.x,place.y);x.restore();occupied.push(place.rect);
     }
+  }
+  if(inputTimelineSample&&inputTimelineSample.pose_valid){
+    const sample=inputTimelineSample,q=project(sample);x.save();x.beginPath();x.arc(q[0],q[1],6,0,Math.PI*2);x.fillStyle='#2563eb';x.fill();x.strokeStyle='#fff';x.lineWidth=2;x.stroke();x.restore();
   }
   $('zoomText').textContent=Math.round(view.zoom*100)+'%';
   const gid=gameIdOf(analysis),modeText=routeMode==='drift'?'仅漂移':routeMode==='recovery'?'起漂→恢复结束':routeMode==='custom'?'自定义路径':'全部路线';

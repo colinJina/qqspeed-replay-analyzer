@@ -1,4 +1,5 @@
 # QQ飞车录像分析器
+本分支是 [Bowingggg/qqspeed-replay-analyzer](https://github.com/Bowingggg/qqspeed-replay-analyzer) 的独立 fork。第1阶段新增 60～67 原始输入通道、62／67 合并候选状态和完整采样时间线。输入名称仍为候选语义；尚未实现自动卡气判断、职业操作建议或键盘参数标定。详见 [第1阶段记录](docs/stages/0001-input-timeline.md)。
 
 把 QQ飞车 `.sav` 录像解析成可核对的分析链：地图身份 → 物理 telemetry → 原生漂移/小喷/动作 → 官方地图几何 → 驾驶分段与 A/B 对比。
 

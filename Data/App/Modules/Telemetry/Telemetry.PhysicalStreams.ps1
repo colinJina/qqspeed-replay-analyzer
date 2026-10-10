@@ -38,7 +38,7 @@ function Load-PhysicalPart {
         if(Test-Path -LiteralPath $fastPath -PathType Leaf) {
             try {
                 $rows=[QQReplayPortable]::LoadFastRows($fastPath,[string]$Meta.profile,[string]$Meta.stream_id)
-                if($null-ne$rows -and $rows.Count-ge2){$transport='qpf_v1'}else{$rows=$null}
+                if($null-ne$rows -and $rows.Count-ge2){$transport='qpf_v2'}else{$rows=$null}
             } catch {
                 $csvRel=[string]$Meta.csv
                 if([string]::IsNullOrWhiteSpace($csvRel)){throw ('Fast physical cache load failed and no CSV compatibility stream exists: '+$_.Exception.Message)}
@@ -82,7 +82,9 @@ function Load-PhysicalPart {
                 (TP-NullableInt -Value (TP-GetCsvField -Row $r -Name 'input_bool_candidate_62')),
                 (TP-NullableInt -Value (TP-GetCsvField -Row $r -Name 'input_bool_candidate_63')),
                 (TP-NullableInt -Value (TP-GetCsvField -Row $r -Name 'input_bool_candidate_64')),
-                (TP-NullableInt -Value (TP-GetCsvField -Row $r -Name 'input_bool_candidate_65'))
+                (TP-NullableInt -Value (TP-GetCsvField -Row $r -Name 'input_bool_candidate_65')),
+                (TP-NullableInt -Value (TP-GetCsvField -Row $r -Name 'input_bool_candidate_66')),
+                (TP-NullableInt -Value (TP-GetCsvField -Row $r -Name 'input_bool_candidate_67'))
             )
             $list.Add([pscustomobject]@{time=$t;x=$x;y=$y;z=$z;speed=$spd;speed_raw=$spd;speed_source=$speedSource;direct_speed=$directSpeed;derived_speed=$derivedSpeed;direct_vx=$directVx;direct_vy=$directVy;direct_vz=$directVz;yaw=$yaw;slip=$slip;raw_slip=$rawSlip;contact_state=$contact;contact_state_name=$contactName;is_airborne=$air;lap_index=$lap;vehicle_forward_heading=$forwardHeading;vehicle_forward_heading_rad=$forwardHeading;input_bool_candidate=$inputCandidate;source=[string]$Meta.stream_id})
         }

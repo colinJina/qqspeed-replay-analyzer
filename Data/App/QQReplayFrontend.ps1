@@ -27,6 +27,8 @@ New-Item -ItemType Directory -Force -Path $outputDir,$dataDir,$tempUploadRoot,$r
 . (Join-Path $appDir 'Modules\Replay\Replay.Catalog.ps1')
 . (Join-Path $appDir 'Modules\Frontend\Frontend.Backend.ps1')
 . (Join-Path $appDir 'Modules\Frontend\Frontend.Http.ps1')
+. (Join-Path $appDir 'Modules\Telemetry\Telemetry.CSharpCore.ps1')
+. (Join-Path $appDir 'Modules\Frontend\Frontend.InputTimeline.ps1')
 # Analysis Closure v1: the segment / comparison contract modules. They are DEFINITION-ONLY, so
 # loading them here costs a parse and no work; the typed telemetry row loader is only initialised
 # when a comparison actually asks for rows.
@@ -83,11 +85,20 @@ function Invoke-FrontendRouter($Stream,$Request,$Html,$FrontendDir,$Root) {
             '/' { Send-Text $Stream 200 'text/html; charset=utf-8' $Html }
             '/css/app.css' { Send-FrontendAsset $Stream $FrontendDir 'css\app.css' 'text/css; charset=utf-8' }
             '/js/app.js' { Send-FrontendAsset $Stream $FrontendDir 'js\app.js' 'text/javascript; charset=utf-8' }
+            '/js/input-timeline.js' { Send-FrontendAsset $Stream $FrontendDir 'js\input-timeline.js' 'text/javascript; charset=utf-8' }
             '/api/analyses' { $arr=@(Get-AnalysisList); Send-Text $Stream 200 'application/json; charset=utf-8' (Json-Text $arr 8) }
             '/api/system-status' { Send-Text $Stream 200 'application/json; charset=utf-8' (Json-Text (Get-SystemStatusLocal) 5) }
             '/api/tool-task-status' { $res=Get-ToolTaskStatus ([string]$params['id']);Send-Text $Stream 200 'application/json; charset=utf-8' (Json-Text $res 6) }
             '/api/analysis' { $fp=Get-AnalysisPath ([string]$params['file']);if($null-eq$fp){Send-Text $Stream 404 'application/json; charset=utf-8' '{"error":"not found"}';break};Send-Response $Stream 200 'application/json; charset=utf-8' ([IO.File]::ReadAllBytes($fp)) }
             '/api/telemetry' { $fp=Get-TelemetryPathForAnalysis ([string]$params['file']);if($null-eq$fp){Send-Text $Stream 404 'application/json; charset=utf-8' '{"error":"telemetry not found"}';break};Send-Response $Stream 200 'application/json; charset=utf-8' ([IO.File]::ReadAllBytes($fp)) }
+            '/api/input-timeline' {
+                try {
+                    $lapNo=0
+                    if(-not[int]::TryParse([string]$params['lap'],[ref]$lapNo)-or$lapNo-lt1){throw 'A positive lap number is required.'}
+                    $timeline=Get-InputTimelineLocal ([string]$params['file']) ([string]$params['stream']) $lapNo
+                    Send-Text $Stream 200 'application/json; charset=utf-8' (Json-Text $timeline 8)
+                } catch { Send-Text $Stream 400 'application/json; charset=utf-8' (Json-Text @{error=$_.Exception.Message} 3) }
+            }
             '/api/map-meta' { $fp=Get-MapMetadataPath $params['map_id'];if($null-eq$fp){Send-Text $Stream 404 'application/json; charset=utf-8' '{"error":"map metadata not found"}';break};Send-Response $Stream 200 'application/json; charset=utf-8' ([IO.File]::ReadAllBytes($fp)) }
             '/asset' {
                 $rel=[string]$params['path'];if([string]::IsNullOrWhiteSpace($rel)){Send-Text $Stream 404 'text/plain; charset=utf-8' 'Not found';break}

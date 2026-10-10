@@ -29,13 +29,16 @@ public sealed class QQReplayPhysicalFastRow
     public int? lap_index;
     public double vehicle_forward_heading;
     public double vehicle_forward_heading_rad;
-    public int?[] input_bool_candidate = new int?[6];
+    public int?[] input_bool_candidate = new int?[8];
     public int? input_bool_candidate_60;
     public int? input_bool_candidate_61;
     public int? input_bool_candidate_62;
     public int? input_bool_candidate_63;
     public int? input_bool_candidate_64;
     public int? input_bool_candidate_65;
+    public int? input_bool_candidate_66;
+    public int? input_bool_candidate_67;
+    public bool? forward_related_input;
     public string source;
     public string source_stream;
     public object system_drift_state;
@@ -151,7 +154,7 @@ public static class QQReplayPortable
         public double MotionHeadingRad, SlipAngleRad, DistanceCumulative;
         public int? ContactState, LapIndex;
         public bool? IsAirborne;
-        public byte?[] InputBoolCandidate = new byte?[6];
+        public byte?[] InputBoolCandidate = new byte?[8];
         public double? VehicleForwardHeadingRad;
     }
 
@@ -159,7 +162,7 @@ public static class QQReplayPortable
         new Profile("2021", 141, 20, 36, null, null, null, null, null),
         new Profile("2025", 218, 16, 32, 44, null, null, null, null),
         // 2026 production schema v1: modern offsets below were promoted only after
-        // source-guided probing plus four-replay cross-validation. Input 60..65 remains unnamed.
+        // source-guided probing plus four-replay cross-validation. Input 60..67 remains unnamed.
         new Profile("2026", QQReplaySchema2026.Stride, QQReplaySchema2026.QuaternionOffset, QQReplaySchema2026.PositionOffset,
             QQReplaySchema2026.LinearVelocityOffset, QQReplaySchema2026.ContactStateOffset, QQReplaySchema2026.LapIndexOffset,
             QQReplaySchema2026.InputBoolCandidateStart, QQReplaySchema2026.VehicleForwardAxisLocal),
@@ -409,7 +412,7 @@ public static class QQReplayPortable
             if (c.P.LapIndexRel.HasValue) { int o=to+c.P.LapIndexRel.Value; if (o>=0 && o+4<=data.Length) r.LapIndex=I32(data,o); }
             if (c.P.InputBoolCandidateStartRel.HasValue) {
                 int o=to+c.P.InputBoolCandidateStartRel.Value;
-                for (int k=0;k<6;k++) if (o+k>=0 && o+k<data.Length) r.InputBoolCandidate[k]=data[o+k];
+                for (int k=0;k<QQReplaySchema2026.InputBoolCandidateCount;k++) if (o+k>=0 && o+k<data.Length) r.InputBoolCandidate[k]=data[o+k];
             }
             if (c.P.VehicleForwardAxisLocal=="-Y") r.VehicleForwardHeadingRad=QuatMinusYHeading(r.Qx,r.Qy,r.Qz,r.Qw);
             foreach(StateField sf in states) { int off=to+sf.Rel; if (off>=0&&off<data.Length) r.States[sf.Rel]=data[off]; }
@@ -445,8 +448,8 @@ public static class QQReplayPortable
     {
         using(FileStream fs=new FileStream(path,FileMode.Create,FileAccess.Write,FileShare.Read))
         using(BinaryWriter w=new BinaryWriter(fs,new UTF8Encoding(false))) {
-            w.Write(new byte[]{0x51,0x51,0x50,0x46,0x41,0x53,0x54,0x31}); // QQPFAST1
-            w.Write(1);
+            w.Write(new byte[]{0x51,0x51,0x50,0x46,0x41,0x53,0x54,0x32}); // QQPFAST2
+            w.Write(2);
             w.Write(rows.Count);
             foreach(Row r in rows) {
                 w.Write(r.TimeS); w.Write((double)r.X); w.Write((double)r.Y); w.Write((double)r.Z);
@@ -458,7 +461,7 @@ public static class QQReplayPortable
                 w.Write((byte)(r.IsAirborne.HasValue?(r.IsAirborne.Value?1:0):255));
                 w.Write(r.LapIndex.HasValue?r.LapIndex.Value:Int32.MinValue);
                 w.Write(r.VehicleForwardHeadingRad.HasValue?r.VehicleForwardHeadingRad.Value:Double.NaN);
-                for(int k=0;k<6;k++) w.Write((byte)(r.InputBoolCandidate[k].HasValue?r.InputBoolCandidate[k].Value:255));
+                for(int k=0;k<QQReplaySchema2026.InputBoolCandidateCount;k++) w.Write((ushort)(r.InputBoolCandidate[k].HasValue?r.InputBoolCandidate[k].Value:UInt16.MaxValue));
             }
         }
     }
@@ -468,11 +471,11 @@ public static class QQReplayPortable
         try {
             using(FileStream fs=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite))
             using(BinaryReader r=new BinaryReader(fs,new UTF8Encoding(false))) {
-                byte[] magic=r.ReadBytes(8); byte[] expected=new byte[]{0x51,0x51,0x50,0x46,0x41,0x53,0x54,0x31};
+                byte[] magic=r.ReadBytes(8); byte[] expected=new byte[]{0x51,0x51,0x50,0x46,0x41,0x53,0x54,0x32};
                 if(magic.Length!=8 || !magic.SequenceEqual(expected)) return false;
-                int version=r.ReadInt32(); if(version!=1) return false;
+                int version=r.ReadInt32(); if(version!=2) return false;
                 int count=r.ReadInt32(); if(count<0 || count>2000000) return false;
-                const long RowBytes=104;
+                const long RowBytes=114;
                 return fs.Length==16L+(long)count*RowBytes;
             }
         } catch { return false; }
@@ -482,9 +485,9 @@ public static class QQReplayPortable
     {
         using(FileStream fs=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite))
         using(BinaryReader r=new BinaryReader(fs,new UTF8Encoding(false))) {
-            byte[] magic=r.ReadBytes(8); byte[] expected=new byte[]{0x51,0x51,0x50,0x46,0x41,0x53,0x54,0x31};
+            byte[] magic=r.ReadBytes(8); byte[] expected=new byte[]{0x51,0x51,0x50,0x46,0x41,0x53,0x54,0x32};
             if(magic.Length!=8 || !magic.SequenceEqual(expected)) throw new InvalidDataException("QQReplay fast physical cache magic mismatch.");
-            int version=r.ReadInt32(); if(version!=1) throw new InvalidDataException("Unsupported QQReplay fast physical cache version: "+version);
+            int version=r.ReadInt32(); if(version!=2) throw new InvalidDataException("Unsupported QQReplay fast physical cache version: "+version);
             int count=r.ReadInt32(); if(count<0 || count>2000000) throw new InvalidDataException("Invalid QQReplay fast physical row count: "+count);
             QQReplayPhysicalFastRow[] rows=new QQReplayPhysicalFastRow[count];
             bool modern=String.Equals(profile,"2026",StringComparison.OrdinalIgnoreCase);
@@ -501,8 +504,9 @@ public static class QQReplayPortable
                 byte air=r.ReadByte(); q.is_airborne=air==255?(bool?)null:(air==1);
                 int lap=r.ReadInt32(); q.lap_index=lap==Int32.MinValue?(int?)null:lap;
                 q.vehicle_forward_heading=r.ReadDouble(); q.vehicle_forward_heading_rad=q.vehicle_forward_heading;
-                for(int k=0;k<6;k++){byte b=r.ReadByte();q.input_bool_candidate[k]=b==255?(int?)null:(int)b;}
-                q.input_bool_candidate_60=q.input_bool_candidate[0]; q.input_bool_candidate_61=q.input_bool_candidate[1]; q.input_bool_candidate_62=q.input_bool_candidate[2]; q.input_bool_candidate_63=q.input_bool_candidate[3]; q.input_bool_candidate_64=q.input_bool_candidate[4]; q.input_bool_candidate_65=q.input_bool_candidate[5];
+                for(int k=0;k<QQReplaySchema2026.InputBoolCandidateCount;k++){ushort b=r.ReadUInt16();q.input_bool_candidate[k]=b==UInt16.MaxValue?(int?)null:(int)b;}
+                q.input_bool_candidate_60=q.input_bool_candidate[0]; q.input_bool_candidate_61=q.input_bool_candidate[1]; q.input_bool_candidate_62=q.input_bool_candidate[2]; q.input_bool_candidate_63=q.input_bool_candidate[3]; q.input_bool_candidate_64=q.input_bool_candidate[4]; q.input_bool_candidate_65=q.input_bool_candidate[5]; q.input_bool_candidate_66=q.input_bool_candidate[6]; q.input_bool_candidate_67=q.input_bool_candidate[7];
+                q.forward_related_input=QQReplayInputCandidates.Forward(q.input_bool_candidate_62,q.input_bool_candidate_67);
                 q.source=streamId; q.source_stream=streamId; q.pose_valid=true; q.pose_break_before=false; q.distance=0.0;
                 q.system_drift_state="unknown"; q.system_drift_state_source="unresolved_not_found";
                 q.nitro_active=false; q.small_boost_active=false; q.air_boost_active=false; q.landing_boost_active=false; q.map_propulsion_active=false; q.small_boost_class_active=false; q.speed_effect_state_source="replay_native_action_object_speed_effect_table_v2";
@@ -533,14 +537,15 @@ public static class QQReplayPortable
     public static void WriteLogicalCsv(string path, QQReplayPhysicalFastRow[] rows)
     {
         using(StreamWriter w=new StreamWriter(path,false,new UTF8Encoding(true))) {
-            string[] h=new string[]{"time_s","x","y","z","speed","speed_raw","speed_source","speed_direct","speed_derived","yaw","slip","distance","pose_valid","pose_break_before","contact_state","contact_state_name","is_airborne","lap_index","vehicle_forward_heading_rad","system_drift_state","system_drift_state_source","input_bool_candidate_60","input_bool_candidate_61","input_bool_candidate_62","input_bool_candidate_63","input_bool_candidate_64","input_bool_candidate_65","source_stream","nitro_active","small_boost_active","air_boost_active","landing_boost_active","map_propulsion_active","small_boost_class_active","speed_effect_state_source"};
+            string[] h=new string[]{"time_s","x","y","z","speed","speed_raw","speed_source","speed_direct","speed_derived","yaw","slip","distance","pose_valid","pose_break_before","contact_state","contact_state_name","is_airborne","lap_index","vehicle_forward_heading_rad","system_drift_state","system_drift_state_source","input_bool_candidate_60","input_bool_candidate_61","input_bool_candidate_62","input_bool_candidate_63","input_bool_candidate_64","input_bool_candidate_65","input_bool_candidate_66","input_bool_candidate_67","forward_related_input","source_stream","nitro_active","small_boost_active","air_boost_active","landing_boost_active","map_propulsion_active","small_boost_class_active","speed_effect_state_source"};
             w.WriteLine(String.Join(",",h));
             foreach(QQReplayPhysicalFastRow q in rows) {
                 List<string> a=new List<string>();
                 a.Add(D(q.time_s));a.Add(D(q.x));a.Add(D(q.y));a.Add(D(q.z));a.Add(D(q.speed));a.Add(D(q.speed_raw));a.Add(Csv(q.speed_source));a.Add(Finite(q.direct_speed)?D(q.direct_speed):"");a.Add(Finite(q.derived_speed)?D(q.derived_speed):"");a.Add(D(q.yaw));a.Add(D(q.slip));a.Add(D(q.distance));a.Add(q.pose_valid?"True":"False");a.Add(q.pose_break_before?"True":"False");
                 a.Add(q.contact_state.HasValue?q.contact_state.Value.ToString(CultureInfo.InvariantCulture):"");a.Add(Csv(q.contact_state_name));a.Add(q.is_airborne.HasValue?(q.is_airborne.Value?"True":"False"):"");a.Add(q.lap_index.HasValue?q.lap_index.Value.ToString(CultureInfo.InvariantCulture):"");a.Add(Finite(q.vehicle_forward_heading_rad)?D(q.vehicle_forward_heading_rad):"");
                 a.Add(Csv(q.system_drift_state==null?"":Convert.ToString(q.system_drift_state,CultureInfo.InvariantCulture)));a.Add(Csv(q.system_drift_state_source));
-                for(int k=0;k<6;k++)a.Add(q.input_bool_candidate[k].HasValue?q.input_bool_candidate[k].Value.ToString(CultureInfo.InvariantCulture):"");
+                for(int k=0;k<QQReplaySchema2026.InputBoolCandidateCount;k++)a.Add(q.input_bool_candidate[k].HasValue?q.input_bool_candidate[k].Value.ToString(CultureInfo.InvariantCulture):"");
+                bool? forward=QQReplayInputCandidates.Forward(q.input_bool_candidate_62,q.input_bool_candidate_67); a.Add(forward.HasValue?(forward.Value?"True":"False"):"");
                 a.Add(Csv(q.source_stream));a.Add(q.nitro_active?"True":"False");a.Add(q.small_boost_active?"True":"False");a.Add(q.air_boost_active?"True":"False");a.Add(q.landing_boost_active?"True":"False");a.Add(q.map_propulsion_active?"True":"False");a.Add(q.small_boost_class_active?"True":"False");a.Add(Csv(q.speed_effect_state_source));
                 w.WriteLine(String.Join(",",a.ToArray()));
             }
@@ -553,7 +558,7 @@ public static class QQReplayPortable
             List<string> h=new List<string>(new string[]{"record_index","time_ms","time_s","qx","qy","qz","qw","x","y","z","file_vx","file_vy","file_vz"});
             foreach(StateField sf in states)h.Add("state_rel_"+(sf.Rel>=0?"+":"")+sf.Rel.ToString(CultureInfo.InvariantCulture));
             h.AddRange(new string[]{"dt_ms","yaw_rad","yaw_deg","derived_vx","derived_vy","derived_vz","speed_xy","speed_3d","accel_3d","motion_heading_rad","slip_angle_rad","distance_cumulative"});
-            h.AddRange(new string[]{"contact_state","contact_state_name","is_airborne","lap_index","vehicle_forward_heading_rad","vehicle_forward_heading_deg","input_bool_candidate_60","input_bool_candidate_61","input_bool_candidate_62","input_bool_candidate_63","input_bool_candidate_64","input_bool_candidate_65"});
+            h.AddRange(new string[]{"contact_state","contact_state_name","is_airborne","lap_index","vehicle_forward_heading_rad","vehicle_forward_heading_deg","input_bool_candidate_60","input_bool_candidate_61","input_bool_candidate_62","input_bool_candidate_63","input_bool_candidate_64","input_bool_candidate_65","input_bool_candidate_66","input_bool_candidate_67"});
             w.WriteLine(String.Join(",",h.Select(Csv).ToArray()));
             foreach(Row r in rows) {
                 List<string> a=new List<string>(); a.Add(r.RecordIndex.ToString());a.Add(r.TimeMs.ToString());a.Add(D(r.TimeS));a.Add(F(r.Qx));a.Add(F(r.Qy));a.Add(F(r.Qz));a.Add(F(r.Qw));a.Add(F(r.X));a.Add(F(r.Y));a.Add(F(r.Z));
@@ -566,7 +571,7 @@ public static class QQReplayPortable
                 a.Add(r.LapIndex.HasValue?r.LapIndex.Value.ToString(CultureInfo.InvariantCulture):"");
                 a.Add(r.VehicleForwardHeadingRad.HasValue?D(r.VehicleForwardHeadingRad.Value):"");
                 a.Add(r.VehicleForwardHeadingRad.HasValue?D(r.VehicleForwardHeadingRad.Value*180.0/Math.PI):"");
-                for(int k=0;k<6;k++) a.Add(r.InputBoolCandidate[k].HasValue?r.InputBoolCandidate[k].Value.ToString(CultureInfo.InvariantCulture):"");
+                for(int k=0;k<QQReplaySchema2026.InputBoolCandidateCount;k++) a.Add(r.InputBoolCandidate[k].HasValue?r.InputBoolCandidate[k].Value.ToString(CultureInfo.InvariantCulture):"");
                 w.WriteLine(String.Join(",",a.Select(Csv).ToArray()));
             }
         }
@@ -596,7 +601,7 @@ public static class QQReplayPortable
                 StringBuilder st=new StringBuilder(); st.Append("["); for(int j=0;j<sf.Count;j++){if(j>0)st.Append(","); StateField f=sf[j]; st.Append("{\"relative_offset\":").Append(f.Rel).Append(",\"unique_values\":[").Append(String.Join(",",f.Unique)).Append("],\"changes\":").Append(f.Changes).Append("}");} st.Append("]");
                 string schemaTag = c.P.Name=="2026" ? ",\"record_semantic_schema_version\":"+QQReplaySchema2026.SchemaVersion+",\"contact_state_offset\":"+QQReplaySchema2026.ContactStateOffset+",\"lap_index_offset\":"+QQReplaySchema2026.LapIndexOffset+",\"input_bool_candidate_start\":"+QQReplaySchema2026.InputBoolCandidateStart+",\"input_bool_candidate_end\":"+QQReplaySchema2026.InputBoolCandidateEnd+",\"input_bool_labels_assigned\":false,\"vehicle_forward_axis_local\":\""+QQReplaySchema2026.VehicleForwardAxisLocal+"\"" : "";
                 string csvJson=writePhysicalCsv?("\""+csvRel+"\""):"null";
-                streamJson.Add("{\"stream_id\":\""+sid+"\",\"primary_by_record_count\":"+(si==primary?"true":"false")+",\"profile\":\""+c.P.Name+"\",\"residue\":"+c.Residue+",\"byte_start\":"+c.StartByte+",\"byte_end\":"+c.EndByte+",\"records\":"+rows.Count+",\"time_start_s\":"+D(rows.Count>0?rows[0].TimeS:0)+",\"time_end_s\":"+D(rows.Count>0?rows[rows.Count-1].TimeS:0)+",\"duration_s\":"+D(dur)+",\"approx_sample_hz\":"+D(hz)+",\"candidate_state_fields\":"+st.ToString()+schemaTag+",\"physical_transport\":\"qpf_v1\",\"fastbin\":\""+fastRel+"\",\"csv\":"+csvJson+"}");
+                streamJson.Add("{\"stream_id\":\""+sid+"\",\"primary_by_record_count\":"+(si==primary?"true":"false")+",\"profile\":\""+c.P.Name+"\",\"residue\":"+c.Residue+",\"byte_start\":"+c.StartByte+",\"byte_end\":"+c.EndByte+",\"records\":"+rows.Count+",\"time_start_s\":"+D(rows.Count>0?rows[0].TimeS:0)+",\"time_end_s\":"+D(rows.Count>0?rows[rows.Count-1].TimeS:0)+",\"duration_s\":"+D(dur)+",\"approx_sample_hz\":"+D(hz)+",\"candidate_state_fields\":"+st.ToString()+schemaTag+",\"physical_transport\":\"qpf_v2\",\"fastbin\":\""+fastRel+"\",\"csv\":"+csvJson+"}");
             }
             string map=SafeMapHint(inputs[ri]);
             manifestReplays.Add("{\"replay_id\":\""+replayId+"\",\"map_hint\":\""+JsonEscape(map)+"\",\"detected_profile\":\""+profile+"\",\"source_size_bytes\":"+data.Length+",\"stream_count\":"+streams.Count+",\"streams\":["+String.Join(",",streamJson.ToArray())+"]}");
@@ -604,7 +609,7 @@ public static class QQReplayPortable
         string productionSchema="{\"schema_version\":"+QQReplaySchema2026.SchemaVersion+",\"profile\":\"2026\",\"stride\":"+QQReplaySchema2026.Stride+",\"time_ms_offset\":"+QQReplaySchema2026.TimeMsOffset+",\"quaternion_range\":["+QQReplaySchema2026.QuaternionOffset+","+(QQReplaySchema2026.QuaternionOffset+15)+"],\"position_range\":["+QQReplaySchema2026.PositionOffset+","+(QQReplaySchema2026.PositionOffset+11)+"],\"contact_state\":{\"offset\":"+QQReplaySchema2026.ContactStateOffset+",\"type\":\"int32\",\"enum_source\":\"historical_tencentcar_enmcontactstatus\",\"confirmed_values\":{\"0\":\"in_air\",\"1\":\"none_contact\",\"2\":\"one_contact\",\"3\":\"two_contact\",\"4\":\"three_contact\",\"5\":\"full_contact\"}},\"input_bool_block_candidate\":{\"start\":"+QQReplaySchema2026.InputBoolCandidateStart+",\"end\":"+QQReplaySchema2026.InputBoolCandidateEnd+",\"binary\":true,\"labels_assigned\":false},\"lap_index\":{\"offset\":"+QQReplaySchema2026.LapIndexOffset+",\"type\":\"int32\",\"observed_base\":1},\"linear_velocity_range\":["+QQReplaySchema2026.LinearVelocityOffset+","+(QQReplaySchema2026.LinearVelocityOffset+11)+"],\"vehicle_forward_axis_local\":\""+QQReplaySchema2026.VehicleForwardAxisLocal+"\"}";
         string manifest="{\"tool\":\"QQReplayExtractor Portable\",\"tool_version\":\"0.4.2\",\"production_record_schema_2026\":"+productionSchema+",\"privacy\":{\"header_copied\":false,\"nickname_exported\":false,\"chat_exported\":false,\"account_metadata_exported\":false,\"source_filename_exported\":false},\"units\":{\"time\":\"seconds / milliseconds\",\"position\":\"game coordinate units\",\"velocity\":\"game coordinate units per second\",\"acceleration\":\"game coordinate units per second^2\"},\"replays\":["+String.Join(",",manifestReplays.ToArray())+"]}";
         File.WriteAllText(Path.Combine(outRoot,"manifest.json"),manifest,new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(outRoot,"README.txt"),"QQReplayExtractor Portable telemetry package\r\n\r\n不含原始回放头部、昵称、聊天或账号元数据。\r\n每个 stream 的 qpf_v1 快速缓存保存生产分析所需的 typed telemetry；兼容导出模式仍可同时写 CSV。快速生产路径不再扫描/导出已退役的 state_rel 候选字段。\r\n2026 schema v1 额外输出已跨录像确认的 contact_state、contact_state_name、lap_index、vehicle_forward_heading，以及未命名的 input_bool_candidate_60..65。\r\nstate_rel_±N 与 input_bool_candidate_* 不强行解释成氮气、漂移、双喷等高级技巧。\r\n",new UTF8Encoding(true));
+        File.WriteAllText(Path.Combine(outRoot,"README.txt"),"QQReplayExtractor Portable telemetry package\r\n\r\n不含原始回放头部、昵称、聊天或账号元数据。\r\n每个 stream 的 qpf_v2 快速缓存保存生产分析所需的 typed telemetry；兼容导出模式仍可同时写 CSV。快速生产路径不再扫描/导出已退役的 state_rel 候选字段。\r\n2026 schema v1 额外输出已跨录像确认的 contact_state、contact_state_name、lap_index、vehicle_forward_heading，以及未命名的 input_bool_candidate_60..67。\r\nstate_rel_±N 与 input_bool_candidate_* 不强行解释成氮气、漂移、双喷等高级技巧。\r\n",new UTF8Encoding(true));
     }
 
     public static void Extract(string[] inputs, string outRoot)

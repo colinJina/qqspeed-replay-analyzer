@@ -7,7 +7,8 @@ public static class QQReplaySchema2026
     public const int PositionOffset = 24;
     public const int ContactStateOffset = 52;
     public const int InputBoolCandidateStart = 60;
-    public const int InputBoolCandidateEnd = 65;
+    public const int InputBoolCandidateEnd = 67;
+    public const int InputBoolCandidateCount = 8;
     public const int LapIndexOffset = 76;
     public const int LinearVelocityOffset = 173;
     public const string VehicleForwardAxisLocal = "-Y";
@@ -65,5 +66,23 @@ public static class QQReplayKinematics
         double fx = -2.0 * (qx * qy - qw * qz);
         double fy = -(1.0 - 2.0 * (qx * qx + qz * qz));
         return System.Math.Atan2(fy, fx);
+    }
+}
+
+// Functional candidates, not claims about a physical keyboard or game input tick.
+public static class QQReplayInputCandidates
+{
+    public static bool? Binary(int? value)
+    {
+        if (value == 0) return false;
+        if (value == 1) return true;
+        return null;
+    }
+    public static bool? Forward(int? channel62, int? channel67)
+    {
+        bool? a = Binary(channel62), b = Binary(channel67);
+        if (a == true || b == true) return true;
+        if (a == false && b == false) return false;
+        return null;
     }
 }

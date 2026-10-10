@@ -19,6 +19,8 @@ $tests=@(
     'Smoke-UserConfirmedBinding.ps1',
     'Smoke-NativeSpeedSource.ps1',
     'Smoke-TelemetryFastPipeline.ps1',
+    'Smoke-InputTimeline.ps1',
+    'Smoke-InputTimelineFrontend.ps1',
     'Smoke-NativeMapModernLayout.ps1',
     'Smoke-PhysicalStreamAliasRejection.ps1',
     'Smoke-NativeEffectLowerBound.ps1',

@@ -12,11 +12,11 @@
 
 $ErrorActionPreference='Stop'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
-$toolVersion='3.8.0-native-first-v3-multishadow1'
+$toolVersion='3.8.1-native-first-input8'
 # The raw physical cache contract covers the physical stream DETECTOR, not only the record
 # decoder: a detector change alters which vehicle streams exist at all, so a cache written by an
 # older detector must never be reused (it would keep reporting the old stream count).
-$rawCacheContract='qpf_v2_nondec_ts_2026schema1_fastpipe1'
+$rawCacheContract='qpf_v3_nondec_ts_2026schema1_input8_fastpipe2'
 # Physical stream detector contract identity. Kept in script scope so the shadow-summary signature
 # can be composed before the C# core is loaded, and cross-checked against the loaded core below.
 $script:PhysicalDetectorContract='physical_streams_v2_nondec_ts'
@@ -26,7 +26,7 @@ $script:PhysicalDetectorContract='physical_streams_v2_nondec_ts'
 # an already written summary. (18: added telemetry_semantic_signature and the stream max_speed.)
 # (19: added the per-stream native action event ownership field and withheld the replay-global
 #  native action table from non-local shadows.)
-$script:TelemetrySchemaVersion=19
+$script:TelemetrySchemaVersion=20
 # The native Drift record contract changed: consecutive records are the two boundaries of one
 # interval in either write order (see ReplayNativeDriftTimeline.ps1). The derived schema revision
 # moves with it so no previously written summary can be reused across the change.
@@ -147,7 +147,7 @@ if(-not$ForceRaw -and (Test-Path -LiteralPath $physicalCachePath -PathType Leaf)
                 $manifestStreams=@($mrep.streams)
                 if($manifestStreams.Count-eq0){$allFast=$false;break}
                 foreach($ms in $manifestStreams){
-                    if([string]$ms.physical_transport-ne'qpf_v1'){$allFast=$false;break}
+                    if([string]$ms.physical_transport-ne'qpf_v2'){$allFast=$false;break}
                     $rel=([string]$ms.fastbin).Replace('/','\')
                     $fastPath=$(if([string]::IsNullOrWhiteSpace($rel)){$null}else{Join-Path $physicalDir $rel})
                     if($null-eq$fastPath -or -not(Test-Path -LiteralPath $fastPath -PathType Leaf) -or -not[QQReplayPortable]::ValidateFastBin($fastPath)){$allFast=$false;break}
@@ -165,7 +165,7 @@ if(-not$physicalCacheHit){
     New-Item -ItemType Directory -Force -Path $physicalDir|Out-Null
     [QQReplayPortable]::ExtractFastFromDelimited($ReplayPath,$physicalDir)
     $manifest=Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8|ConvertFrom-Json
-    $cache=[ordered]@{schema_version=1;contract=$rawCacheContract;detector_contract=$coreDetectorContract;source_sha256=$ReplaySha256;source_size_bytes=[long]$sourceInfo.Length;source_last_write_utc=$sourceInfo.LastWriteTimeUtc.ToString('o');physical_transport='qpf_v1';cache_scope=$cacheScope}
+    $cache=[ordered]@{schema_version=1;contract=$rawCacheContract;detector_contract=$coreDetectorContract;source_sha256=$ReplaySha256;source_size_bytes=[long]$sourceInfo.Length;source_last_write_utc=$sourceInfo.LastWriteTimeUtc.ToString('o');physical_transport='qpf_v2';cache_scope=$cacheScope}
     Write-JsonUtf8 $physicalCachePath $cache 6
     Write-Host ('  [物理缓存] rebuilt '+$rawCacheContract+' · detector='+$coreDetectorContract)
 }else{
@@ -255,9 +255,8 @@ foreach($part in $parts) {
         $ids=New-Object System.Collections.Generic.List[string];$ids.Add($part.id)
         $groups.Add([pscustomobject]@{hz=$part.hz;rows=$lst;parts=$ids;t0=$part.t0;t1=$part.t1;x1=$part.x1;y1=$part.y1;z1=$part.z1;speed_source=[string]$part.speed_source;profile=[string]$part.profile;record_semantic_schema_version=[int]$part.record_semantic_schema_version;vehicle_forward_axis_local=[string]$part.vehicle_forward_axis_local})
     } else {
-        $startAt=0
-        if($best.rows.Count -gt 0 -and [Math]::Abs($part.rows[0].time-$best.rows[$best.rows.Count-1].time) -lt 0.001){$startAt=1}
-        for($i=$startAt;$i -lt $part.rows.Count;$i++){$best.rows.Add($part.rows[$i])}
+        # Preserve every source sample, including equal-time boundary input changes.
+        for($i=0;$i -lt $part.rows.Count;$i++){$best.rows.Add($part.rows[$i])}
         $best.parts.Add($part.id);$best.t1=$part.t1;$best.x1=$part.x1;$best.y1=$part.y1;$best.z1=$part.z1
         $best.hz=($best.hz+$part.hz)/2.0
     }
@@ -277,7 +276,7 @@ for($gi=0;$gi -lt $logical.Count;$gi++) {
     $rows=@($g.rows.ToArray())
     $streamWatch=[Diagnostics.Stopwatch]::StartNew()
 
-    # 2026-format replays can contain a few one-frame pose snaps. qpf_v1 typed rows
+    # 2026-format replays can contain a few one-frame pose snaps. qpf_v2 typed rows
     # use the C# fast detector; CSV compatibility rows retain the original PowerShell path.
     $edgeStep=New-Object double[] $rows.Count
     $edgeBreak=New-Object bool[] $rows.Count
@@ -349,7 +348,7 @@ for($gi=0;$gi -lt $logical.Count;$gi++) {
             $r.nitro_active=$false;$r.small_boost_active=$false;$r.air_boost_active=$false;$r.landing_boost_active=$false;$r.map_propulsion_active=$false;$r.small_boost_class_active=$false;$r.speed_effect_state_source='replay_native_action_object_speed_effect_table_v2'
             $clean.Add($r)
         } else {
-            $clean.Add([pscustomobject]@{time_s=[double]$r.time;x=[double]$r.x;y=[double]$r.y;z=[double]$r.z;speed=[double]$speedFixed[$i];speed_raw=$rawSpd;speed_source=[string]$r.speed_source;speed_direct=(Safe-Number ([double]$r.direct_speed) ([double]::NaN));speed_derived=(Safe-Number ([double]$r.derived_speed) ([double]::NaN));yaw=(Safe-Number ([double]$r.yaw) 0.0);slip=(Safe-Number ([double]$r.slip) 0.0);distance=$cum;pose_valid=[bool]$poseValid[$i];pose_break_before=[bool]$edgeBreak[$i];contact_state=$r.contact_state;contact_state_name=[string]$r.contact_state_name;is_airborne=$r.is_airborne;lap_index=$r.lap_index;vehicle_forward_heading_rad=$r.vehicle_forward_heading;system_drift_state='unknown';system_drift_state_source='unresolved_not_found';input_bool_candidate_60=$(if($inputs.Count-gt0){$inputs[0]}else{$null});input_bool_candidate_61=$(if($inputs.Count-gt1){$inputs[1]}else{$null});input_bool_candidate_62=$(if($inputs.Count-gt2){$inputs[2]}else{$null});input_bool_candidate_63=$(if($inputs.Count-gt3){$inputs[3]}else{$null});input_bool_candidate_64=$(if($inputs.Count-gt4){$inputs[4]}else{$null});input_bool_candidate_65=$(if($inputs.Count-gt5){$inputs[5]}else{$null});source_stream=[string]$r.source;nitro_active=$false;small_boost_active=$false;air_boost_active=$false;landing_boost_active=$false;map_propulsion_active=$false;small_boost_class_active=$false;speed_effect_state_source='replay_native_action_object_speed_effect_table_v2'})
+            $clean.Add([pscustomobject]@{time_s=[double]$r.time;x=[double]$r.x;y=[double]$r.y;z=[double]$r.z;speed=[double]$speedFixed[$i];speed_raw=$rawSpd;speed_source=[string]$r.speed_source;speed_direct=(Safe-Number ([double]$r.direct_speed) ([double]::NaN));speed_derived=(Safe-Number ([double]$r.derived_speed) ([double]::NaN));yaw=(Safe-Number ([double]$r.yaw) 0.0);slip=(Safe-Number ([double]$r.slip) 0.0);distance=$cum;pose_valid=[bool]$poseValid[$i];pose_break_before=[bool]$edgeBreak[$i];contact_state=$r.contact_state;contact_state_name=[string]$r.contact_state_name;is_airborne=$r.is_airborne;lap_index=$r.lap_index;vehicle_forward_heading_rad=$r.vehicle_forward_heading;system_drift_state='unknown';system_drift_state_source='unresolved_not_found';input_bool_candidate_60=$(if($inputs.Count-gt0){$inputs[0]}else{$null});input_bool_candidate_61=$(if($inputs.Count-gt1){$inputs[1]}else{$null});input_bool_candidate_62=$(if($inputs.Count-gt2){$inputs[2]}else{$null});input_bool_candidate_63=$(if($inputs.Count-gt3){$inputs[3]}else{$null});input_bool_candidate_64=$(if($inputs.Count-gt4){$inputs[4]}else{$null});input_bool_candidate_65=$(if($inputs.Count-gt5){$inputs[5]}else{$null});input_bool_candidate_66=$(if($inputs.Count-gt6){$inputs[6]}else{$null});input_bool_candidate_67=$(if($inputs.Count-gt7){$inputs[7]}else{$null});forward_related_input=[QQReplayInputCandidates]::Forward($(if($inputs.Count-gt2){$inputs[2]}else{$null}),$(if($inputs.Count-gt7){$inputs[7]}else{$null}));source_stream=[string]$r.source;nitro_active=$false;small_boost_active=$false;air_boost_active=$false;landing_boost_active=$false;map_propulsion_active=$false;small_boost_class_active=$false;speed_effect_state_source='replay_native_action_object_speed_effect_table_v2'})
         }
     }
     $cleanRows=$clean.ToArray()
@@ -487,7 +486,7 @@ for($gi=0;$gi -lt $logical.Count;$gi++) {
             evidence_matrix=@($productionActions.evidence_matrix)
         }
     })
-    $streamProfiles.Add([ordered]@{id=$id;role=$role;records=$cleanRows.Count;physical_transport=$(if($useFastRows){'qpf_v1'}else{'csv_compat'});geometry_prepare_ms=$geometryPrepMs;semantic_actions_ms=$semanticMs;logical_csv_write_ms=$logicalWriteMs;total_stream_ms=[long]$streamWatch.ElapsedMilliseconds;drift_resolve_ms=$driftResolveMs;drift_convert_ms=$driftConvertMs;speed_effect_resolve_ms=$speedResolveMs;speed_effect_convert_ms=$speedConvertMs;combo_resolve_ms=$comboResolveMs;native_effect_table_source=$nativeEffectTableSource})
+    $streamProfiles.Add([ordered]@{id=$id;role=$role;records=$cleanRows.Count;physical_transport=$(if($useFastRows){'qpf_v2'}else{'csv_compat'});geometry_prepare_ms=$geometryPrepMs;semantic_actions_ms=$semanticMs;logical_csv_write_ms=$logicalWriteMs;total_stream_ms=[long]$streamWatch.ElapsedMilliseconds;drift_resolve_ms=$driftResolveMs;drift_convert_ms=$driftConvertMs;speed_effect_resolve_ms=$speedResolveMs;speed_effect_convert_ms=$speedConvertMs;combo_resolve_ms=$comboResolveMs;native_effect_table_source=$nativeEffectTableSource})
 
     # Ownership boundary. The replay-native action event table is decoded ONCE per replay and the
     # container carries no per-vehicle owner for it, so it may only be published on the local
@@ -507,7 +506,8 @@ for($gi=0;$gi -lt $logical.Count;$gi++) {
 
     $streamOut.Add([ordered]@{
         id=$id;role=$role;role_label=$roleLabel;sample_hz=[Math]::Round([double]$g.hz,3);records=$clean.Count;speed_source=[string]$g.speed_source
-        record_semantic_schema_version=$resolvedRecordSchemaVersion;vehicle_forward_axis_local=$resolvedForwardAxisLocal;contact_state_contract_version=1;contact_state_values=$contactValues;lap_index_values=$lapValues;input_bool_candidate_range='60..65';input_bool_labels_assigned=$false
+        record_semantic_schema_version=$resolvedRecordSchemaVersion;vehicle_forward_axis_local=$resolvedForwardAxisLocal;contact_state_contract_version=1;contact_state_values=$contactValues;lap_index_values=$lapValues;input_bool_candidate_range='60..67';input_bool_labels_assigned=$false
+        input_contract=[ordered]@{version=2;raw_range='60..67';raw_values_preserved=$true;forward_related_rule='binary OR of 62 and 67; unknown is not released';semantic_status='candidate_functional_requires_replay_validation';frame_kind='replay_sample'}
         duration_s=[Math]::Round($duration,4);distance=[Math]::Round($cum,3);avg_speed=[Math]::Round($avgSpeed,3);max_speed=$(if($null-ne$maxSpeed){[Math]::Round([double]$maxSpeed,3)}else{$null})
         lap_schema_version=2;lap_count=$laps.Count;lap_status=$(if($laps.Count-gt0){'replay_native_lap_index'}else{'unavailable_no_fallback'});lap_source=$(if($laps.Count-gt0){'replay_native_int32_offset_76'}else{$null});laps=$laps
         part_count=$g.parts.Count;source_streams=@($g.parts.ToArray());csv=$csvName;preview=$preview.ToArray()
@@ -535,7 +535,7 @@ Write-JsonUtf8 $evidencePath $evidence 12
 Add-PipelineStage 'evidence_summary_write'
 
 $summary=[ordered]@{
-    schema_version=$script:TelemetrySchemaVersion;telemetry_semantic_signature=$(Get-TelemetrySemanticSignature);architecture='native_first_v1';native_first_semantic_contract_version=3;speed_contract_version=2;contact_state_contract_version=1;record_semantic_schema_version=1;lap_schema_version=2;drift_schema_version=5;drift_state_contract_version=5;replay_native_drift_timeline_schema_version=$script:TelemetryDriftTimelineSchemaVersion;replay_native_speed_effect_timeline_schema_version=$script:TelemetrySpeedEffectTimelineSchemaVersion;boost_effect_contract_version=3;combo_action_schema_version=2;semantic_model_contract_version=4;pose_discontinuity_schema_version=1;extractor_version=$toolVersion;replay_file=[IO.Path]::GetFileName($ReplayPath);source_sha256=$ReplaySha256;physical_transport_contract='qpf_v1';physical_cache_mode=$(if($physicalCacheHit){'reuse'}else{'rebuilt'});physical_cache_scope=$cacheScope;pipeline_profile_path='pipeline_profile.json';native_action_evidence_summary_path='native_action_evidence_summary.json';native_action_cache_contract=[string]$nativeActionScan.contract;native_action_cache_scanner_contract=[string]$nativeActionScan.scanner_contract;native_action_cache_mode=[string]$nativeActionScan.mode;native_action_cache_status=[string]$nativeActionScan.status;native_action_cache_scope=[string]$nativeActionScan.scope;native_action_cache_key=$(if([string]::IsNullOrWhiteSpace([string]$nativeActionScan.cache_dir)){$null}else{[IO.Path]::GetFileName([string]$nativeActionScan.cache_dir)});native_action_cache_write_status=[string]$nativeActionScan.write_status;native_action_tail_status=[string]$nativeActionScan.tail_status;native_action_scan_read_source_sav=[bool]$nativeActionScan.source_read;native_action_scan_from_tail=[bool]$nativeActionScan.tail_rescan;native_action_cache_read_ms=[long]$nativeActionScan.lookup_ms;native_action_scan_ms=[long]$nativeActionScan.scan_ms;native_action_cache_write_ms=[long]$nativeActionScan.write_ms;native_action_candidate_count=[int]$nativeActionScan.candidate_count;native_action_effect_table_count=[int]$nativeActionScan.effect_table_count
+    schema_version=$script:TelemetrySchemaVersion;telemetry_semantic_signature=$(Get-TelemetrySemanticSignature);architecture='native_first_v1';native_first_semantic_contract_version=3;speed_contract_version=2;contact_state_contract_version=1;record_semantic_schema_version=1;lap_schema_version=2;drift_schema_version=5;drift_state_contract_version=5;replay_native_drift_timeline_schema_version=$script:TelemetryDriftTimelineSchemaVersion;replay_native_speed_effect_timeline_schema_version=$script:TelemetrySpeedEffectTimelineSchemaVersion;boost_effect_contract_version=3;combo_action_schema_version=2;semantic_model_contract_version=4;pose_discontinuity_schema_version=1;extractor_version=$toolVersion;replay_file=[IO.Path]::GetFileName($ReplayPath);source_sha256=$ReplaySha256;physical_transport_contract='qpf_v2';physical_cache_mode=$(if($physicalCacheHit){'reuse'}else{'rebuilt'});physical_cache_scope=$cacheScope;pipeline_profile_path='pipeline_profile.json';native_action_evidence_summary_path='native_action_evidence_summary.json';native_action_cache_contract=[string]$nativeActionScan.contract;native_action_cache_scanner_contract=[string]$nativeActionScan.scanner_contract;native_action_cache_mode=[string]$nativeActionScan.mode;native_action_cache_status=[string]$nativeActionScan.status;native_action_cache_scope=[string]$nativeActionScan.scope;native_action_cache_key=$(if([string]::IsNullOrWhiteSpace([string]$nativeActionScan.cache_dir)){$null}else{[IO.Path]::GetFileName([string]$nativeActionScan.cache_dir)});native_action_cache_write_status=[string]$nativeActionScan.write_status;native_action_tail_status=[string]$nativeActionScan.tail_status;native_action_scan_read_source_sav=[bool]$nativeActionScan.source_read;native_action_scan_from_tail=[bool]$nativeActionScan.tail_rescan;native_action_cache_read_ms=[long]$nativeActionScan.lookup_ms;native_action_scan_ms=[long]$nativeActionScan.scan_ms;native_action_cache_write_ms=[long]$nativeActionScan.write_ms;native_action_candidate_count=[int]$nativeActionScan.candidate_count;native_action_effect_table_count=[int]$nativeActionScan.effect_table_count
     speed_contract=[ordered]@{version=2;modern_2026_source='replay_linear_velocity';legacy_fallback='not_authoritative';diagnostic_source='speed_derived';rule='Native-first production uses replay-native linear velocity. Derived position velocity may remain in diagnostics but cannot silently become authoritative.'}
     contact_state_contract=[ordered]@{version=1;source='replay_native_int32_offset_52';enum_source='historical_tencentcar_enmcontactstatus';values=[ordered]@{'0'='in_air';'1'='none_contact';'2'='one_contact';'3'='two_contact';'4'='three_contact';'5'='full_contact'};rule='Preserve the replay-native contact enum. Do not collapse states 1..4 into inferred airborne/full-contact booleans.'}
     semantic_model_contract=[ordered]@{
@@ -574,7 +574,7 @@ $profile=[ordered]@{
         histogram=$(if([bool]$nativeActionEventDecode.available){$nativeActionEventDecode.histogram}else{@{}})
         window_source=[string]$nativeActionEventDecode.window_source;elapsed_ms=[long]$nativeActionEventDecode.elapsed_ms
     }
-    total_ms=[long]$pipelineWatch.ElapsedMilliseconds;physical_cache_mode=$(if($physicalCacheHit){'reuse'}else{'rebuilt'});physical_cache_scope=$cacheScope;physical_transport='qpf_v1';raw_cache_contract=$rawCacheContract
+    total_ms=[long]$pipelineWatch.ElapsedMilliseconds;physical_cache_mode=$(if($physicalCacheHit){'reuse'}else{'rebuilt'});physical_cache_scope=$cacheScope;physical_transport='qpf_v2';raw_cache_contract=$rawCacheContract
     native_action=[ordered]@{
         contract=[string]$nativeActionScan.contract;scanner_contract=[string]$nativeActionScan.scanner_contract
         mode=[string]$nativeActionScan.mode;scope=[string]$nativeActionScan.scope;status=[string]$nativeActionScan.status;reason=[string]$nativeActionScan.reason
@@ -587,7 +587,7 @@ $profile=[ordered]@{
     stages=$profileStages.ToArray();streams=$streamProfiles.ToArray()
 }
 Write-JsonUtf8 $profilePath $profile 10
-Write-Host ('  [性能] total='+$profile.total_ms+'ms · physical='+$profile.physical_cache_mode+' · transport=qpf_v1 · cache='+$cacheScope+' · action='+[string]$nativeActionScan.mode)
+Write-Host ('  [性能] total='+$profile.total_ms+'ms · physical='+$profile.physical_cache_mode+' · transport=qpf_v2 · cache='+$cacheScope+' · action='+[string]$nativeActionScan.mode)
 foreach($sp in @($streamProfiles.ToArray())){Write-Host ('    [性能/'+[string]$sp.role+'] prep='+[string]$sp.geometry_prepare_ms+'ms semantic='+[string]$sp.semantic_actions_ms+'ms csv='+[string]$sp.logical_csv_write_ms+'ms total='+[string]$sp.total_stream_ms+'ms')}
 Write-Host ('  [证据索引] '+$evidencePath)
 Write-Host ('  影子数据完成: '+$summaryPath)

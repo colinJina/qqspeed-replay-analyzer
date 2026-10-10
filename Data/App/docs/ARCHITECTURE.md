@@ -1,4 +1,4 @@
-﻿# Native-First architecture
+# Native-First architecture
 
 This document describes the **current** architecture and authority boundaries only. It is not an evolution history; use Git history for that.
 
@@ -248,7 +248,7 @@ Section pairing and continuous comparison are descriptive only. They compare obs
 
 ### PhysicalTelemetryCache
 
-`qpf_v2_nondec_ts_2026schema1_fastpipe1` is a source-SHA + decoder-contract + **detector-contract**
+`qpf_v3_nondec_ts_2026schema1_input8_fastpipe2` is a source-SHA + decoder-contract + **detector-contract**
 validated transport cache. It changes transport cost, not semantic authority.
 
 The descriptor binds the detector explicitly through a required `detector_contract` field
@@ -355,3 +355,8 @@ These are not production authority and must not be introduced as convenience fal
 
 Pre-release development rebuilds may destructively rebuild derived outputs. Raw replay archive and validated persistent transport/evidence caches are preserved according to `Modules/Replay/Replay.DevRebuild.ps1`.
 
+
+
+### Input timeline stage 1
+
+The qpf_v2 transport uses QQPFAST2/version 2, eight UInt16 input cells, and a 114-byte row. Values 0..255 are preserved; 65535 means absent, so a raw 255 is no longer lost. Old six-channel descriptors and binaries fail validation and rebuild from the source. Logical merging preserves equal-time boundary records. The complete CSV timeline publishes raw offsets 60..67 and a nullable candidate binary OR of 62/67. Other input labels and the combined game-state interpretation remain unverified candidates. Playback never selects a future nearest sample; individual equal-time records remain seekable. This stage adds no cardrift or coaching authority.
