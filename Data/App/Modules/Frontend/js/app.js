@@ -867,7 +867,7 @@ function getReferenceTrack(){return ensureViewModel().referenceTrack}
 function redrawCanvas(){const vm=ensureViewModel();drawRoute(vm.referenceTrack,vm.subjectTrack)}
 function renderAll(){
   inputTimeline.sync({file:currentFile,stream:stream?.id,lap:currentLap,revision:analysisRevision});
-  complexActions.sync({subject:currentFile&&stream&&currentLap?{file:currentFile,stream:stream.id,lap:Number(currentLap)}:null,baseline:compareFile&&referenceStream()&&compareLap?{file:compareFile,stream:referenceStream().id,lap:Number(compareLap)}:null,choices:records.filter(r=>sameMapCompatible(currentRecord(),r)).map(r=>({file:r.file,label:compactReplayLabel(r)||r.file})),revision:analysisRevision});
+  complexActions.sync({subject:currentFile&&stream&&currentLap?{file:currentFile,stream:stream.id,lap:Number(currentLap)}:null,baseline:compareFile&&referenceStream()&&compareLap?{file:compareFile,stream:referenceStream().id,lap:Number(compareLap)}:null,scope:currentRecord()?.complex_action_eligibility,choices:records.filter(r=>r.complex_action_eligibility?.allowed&&sameMapCompatible(currentRecord(),r)).map(r=>({file:r.file,label:compactReplayLabel(r)||r.file})),revision:analysisRevision});
   fitMapViewportHeight();
   const vm=ensureViewModel();
   const subjectTrack=vm.subjectTrack,referenceTrack=vm.referenceTrack;

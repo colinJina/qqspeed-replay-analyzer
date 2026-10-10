@@ -52,6 +52,8 @@
 
 # --- Workspace-root scratch ----------------------------------------------
 /Screenshot_*.jpg
+# Local browser acceptance snapshots and console logs.
+/.playwright-mcp/
 
 # --- Agent / editor / OS local state ------------------------------------
 .dsh-meow/

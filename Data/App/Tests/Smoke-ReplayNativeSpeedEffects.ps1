@@ -24,7 +24,7 @@ function Run-RealControl([string]$Name,[hashtable]$Expected,[string]$Archive,[st
     foreach($line in $childOutput){Write-Host ([string]$line)}
     if($childExit-ne0){throw ($Name+' telemetry exited '+$childExit)}
     $sum=Get-Content -LiteralPath (Join-Path $out 'telemetry_summary.json') -Raw -Encoding UTF8|ConvertFrom-Json
-    if([int]$sum.schema_version-ne19-or[int]$sum.replay_native_speed_effect_timeline_schema_version-ne2-or[int]$sum.boost_effect_contract_version-ne3){throw ($Name+' schema mismatch: telemetry='+$sum.schema_version+' speedfx='+$sum.replay_native_speed_effect_timeline_schema_version+' boost='+$sum.boost_effect_contract_version)}
+    if([int]$sum.schema_version-ne20-or[int]$sum.replay_native_speed_effect_timeline_schema_version-ne2-or[int]$sum.boost_effect_contract_version-ne3){throw ($Name+' schema mismatch: telemetry='+$sum.schema_version+' speedfx='+$sum.replay_native_speed_effect_timeline_schema_version+' boost='+$sum.boost_effect_contract_version)}
     $st=@($sum.streams|Where-Object{[bool]$_.speed_effect_state_available}|Sort-Object {[int]$_.native_speed_effect_segment_count} -Descending|Select-Object -First 1)
     if($st.Count-eq0){throw ($Name+' did not expose a native speed-effect stream.')}
     $s=$st[0]
@@ -100,7 +100,7 @@ try {
     if(-not[bool]$sceneResolved.available-or[int]$sceneSeg.map_propulsion_effect_count-ne1-or[int]$sceneSeg.unknown_speed_effect_count-ne0){throw 'Zero-Drift code2003 map propulsion effect did not decode independently.'}
 
     $manifest=Get-Content -LiteralPath (Join-Path $AppDir 'app_manifest.json') -Raw -Encoding UTF8|ConvertFrom-Json
-    if([int]$manifest.data_schemas.telemetry-ne19-or[int]$manifest.data_schemas.replay_native_speed_effect_timeline-ne2-or[int]$manifest.data_schemas.boost_effect_contract-ne3-or[int]$manifest.data_schemas.semantic_model_contract-ne4){throw ('Installed manifest does not expose telemetry19/native-speedfx2/boost3/semantic4. app='+[string]$manifest.app_version)}
+    if([int]$manifest.data_schemas.telemetry-ne20-or[int]$manifest.data_schemas.replay_native_speed_effect_timeline-ne2-or[int]$manifest.data_schemas.boost_effect_contract-ne3-or[int]$manifest.data_schemas.semantic_model_contract-ne4){throw ('Installed manifest does not expose telemetry20/native-speedfx2/boost3/semantic4. app='+[string]$manifest.app_version)}
 
     # Required historical real benchmarks.  Code2003 is now map propulsion, no longer unknown.
     $dataDir=Split-Path -Parent $AppDir;$archive=Join-Path $dataDir 'ReplayArchive';$tele=Join-Path $AppDir 'QQReplayTelemetry.ps1'

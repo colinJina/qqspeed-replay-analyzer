@@ -1,4 +1,17 @@
-# Derived input observations. These rules never promote an input candidate to a native action.
+﻿# Derived input observations. These rules never promote an input candidate to a native action.
+function NCA-MapEligibility($Identity) {
+    # Game145 is 月牙湾 in the bundled room catalog. The verified Game145 -> Resource45
+    # binding is pinned by Smoke-MapCoverage; this is an explicit pair, never a +100 rule.
+    $allowed=$false;$reason='map_identity_unconfirmed'
+    $message='卡气分析仅开放月牙湾；当前地图身份未确认。逐采样指法和普通分析仍可查看。'
+    $rid=NAS-Prop $Identity 'resource_map_id';$gid=NAS-Prop $Identity 'game_map_id'
+    if([bool](NAS-Prop $Identity 'authoritative')){
+        if($null-ne$rid-and[int]$rid-eq45-and($null-eq$gid-or[int]$gid-eq145)){
+            $allowed=$true;$reason='moon_bay';$message='仅分析月牙湾开头的卡气练习区域；请分别填写各份录像的起止时间。'
+        } else {$reason='map_out_of_scope';$message='卡气分析仅开放月牙湾。当前地图可查看逐采样指法、速度及普通弯道 A/B。'}
+    }
+    return [pscustomobject][ordered]@{contract='moon_bay_complex_scope_v1';allowed=$allowed;reason=$reason;message=$message;resource_map_id=$rid;game_map_id=$gid;requires_focus_range=$true}
+}
 function NCA-Binary($Value) {
     if($null-eq$Value){return $null};if($Value-eq1){return $true};if($Value-eq0){return $false};return $null
 }

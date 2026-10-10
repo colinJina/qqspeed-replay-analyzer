@@ -10,7 +10,7 @@ Require ([string]$manifest.architecture -eq 'native_first_v1') 'manifest archite
 Require ([int]$manifest.data_schemas.analysis -eq 29) 'analysis schema must be 29'
 Require ([int]$manifest.data_schemas.analysis_segments -eq 3) 'analysis segment schema must be 3'
 Require ([int]$manifest.data_schemas.native_driving_sections -eq 1) 'native driving sections schema must be 1'
-Require ([int]$manifest.data_schemas.telemetry -eq 19) 'telemetry schema must be 19'
+Require ([int]$manifest.data_schemas.telemetry -eq 20) 'telemetry schema must be 20'
 Require ([int]$manifest.data_schemas.map_catalog -eq 6) 'map catalog schema must be 6'
 Require ([int]$manifest.data_schemas.replay_native_drift_timeline -eq 4) 'native drift timeline schema must be 4'
 Require ([int]$manifest.data_schemas.native_driving_episodes -eq 1) 'native driving episodes schema must be 1'

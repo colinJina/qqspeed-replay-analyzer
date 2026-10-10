@@ -347,7 +347,7 @@ try{
         foreach($line in $child1){Write-Host ([string]$line)}
         Require ($exit1-eq0) ('real benchmark rebuild exited '+[string]$exit1)
         $sum1=Get-Content -LiteralPath (Join-Path $out1 'telemetry_summary.json') -Raw -Encoding UTF8|ConvertFrom-Json
-        Require ([int]$sum1.schema_version-eq19) 'real benchmark telemetry schema changed'
+        Require ([int]$sum1.schema_version-eq20) 'real benchmark telemetry schema changed'
         Require ([string]$sum1.native_action_cache_mode-eq'rebuilt') ('real benchmark action cache mode must be rebuilt: '+[string]$sum1.native_action_cache_mode)
         Require ([bool]$sum1.native_action_scan_read_source_sav) 'real benchmark rebuild must read the source replay'
         Require ([long]$sum1.native_action_scan_ms-gt0) 'real benchmark rebuild must report a native action scan time'

@@ -9,6 +9,12 @@ function Put([byte[]]$D,[int]$O,[byte[]]$Value){[Array]::Copy($Value,0,$D,$O,$Va
 try {
     . (Join-Path $AppDir 'Modules\Telemetry\Telemetry.CSharpCore.ps1')
     Initialize-TelemetryCSharpCore -AppDir $AppDir
+    $appManifest=Get-Content -LiteralPath (Join-Path $AppDir 'app_manifest.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    $schemaAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $AppDir 'QQReplayTelemetry.ps1'),[ref]$null,[ref]$null)
+    $schemaAssignment=$schemaAst.Find({param($node)$node-is[Management.Automation.Language.AssignmentStatementAst]-and$node.Left.Extent.Text-eq'$script:TelemetrySchemaVersion'},$true)
+    Require ($null-ne$schemaAssignment) 'Extractor telemetry schema declaration is missing.'
+    $schemaLiteral=$schemaAssignment.Right.Find({param($node)$node-is[Management.Automation.Language.ConstantExpressionAst]},$true)
+    Require ($null-ne$schemaLiteral-and[int]$appManifest.data_schemas.telemetry-eq[int]$schemaLiteral.Value) 'Manifest telemetry schema differs from the actual extractor.'
     $count=240;$bytes=New-Object byte[] ($count*230+512)
     for($i=0;$i-lt$count;$i++){
         $b=$i*230;Put $bytes $b ([BitConverter]::GetBytes([uint32]($i*17)))

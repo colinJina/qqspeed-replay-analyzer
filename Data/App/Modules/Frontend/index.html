@@ -101,8 +101,8 @@
         <details class="inputTimelineRaw"><summary>原始值与定位信息</summary><div data-timeline="raw">—</div><div>位置 <span data-timeline="position">—</span> · 来源 <span data-timeline="source">—</span></div></details>
       </section>
       <details class="panel complexPanel" id="complexActionsPanel">
-        <summary>卡气量化与参考分析 <span class="subtle">完整采样 · 候选阶段待核对</span></summary>
-        <p class="subtle">先在上方选择 A／B 录像与圈次，再量化。可用各自录像时间筛选练习区域；筛选保留候选的自然终点。持续漂移候选需人工核对是否为超级漂。</p>
+        <summary>卡气量化与参考分析 <span class="subtle">仅月牙湾 · 候选阶段待核对</span></summary>
+        <p class="subtle">仅开放月牙湾。先选择 A／B 录像与圈次，分别填写开头卡气练习区域的起止时间，再量化；筛选保留候选的自然终点。持续漂移候选需人工核对是否为超级漂。</p>
         <div class="complexControls">
           <label>A 起点秒 <input data-complex="a-start" type="number" step="0.01" min="0"></label><label>A 终点秒 <input data-complex="a-end" type="number" step="0.01" min="0"></label>
           <label>B 起点秒 <input data-complex="b-start" type="number" step="0.01" min="0"></label><label>B 终点秒 <input data-complex="b-end" type="number" step="0.01" min="0"></label>
@@ -113,7 +113,7 @@
         <div class="complexTableWrap"><table class="complexTable"><thead><tr><th>A 候选阶段</th><th>A 自然区间／速度</th><th>输入与衔接</th><th>B 对应阶段</th><th>共同区间 A−B</th><th>起卡位置偏移</th><th>证据</th></tr></thead><tbody data-complex="rows"></tbody></table></div>
         <details><summary>原始输入与采样证据</summary><div data-complex="evidence" class="complexEvidence">点击阶段的证据按钮。</div></details>
         <details class="complexReferences"><summary>多份参考与操作建议</summary>
-          <p class="subtle">选择同图参考录像，可逐份指定流、圈次及练习区域。系统不验证职业身份；参考角色由你选择。最多8份，按策略和空间对应筛选后汇总。</p>
+          <p class="subtle">选择月牙湾参考录像，逐份指定流、圈次及开头练习区域的起止时间。系统不验证职业身份；参考角色由你选择。最多8份，按策略和空间对应筛选后汇总。</p>
           <div class="complexControls"><select data-complex="reference-choice" aria-label="选择参考录像"></select><button class="btn" data-complex="add-reference">添加参考</button><button class="btn" data-complex="add-baseline">加入当前 B</button></div>
           <div data-complex="references"></div>
           <div class="complexDeclarations">

@@ -429,6 +429,7 @@ function Get-AnalysisList {
             comparison_map_source=$(if($null-ne$identity -and -not[string]::IsNullOrWhiteSpace([string]$identity.course_key)){'resource_map_id'}elseif(($null-ne$identity -and $null-ne$identity.game_map_id) -or $null-ne$j.game_map_id){'trusted_game_map_id'}elseif(-not[string]::IsNullOrWhiteSpace($comparisonNameKey)){'exact_same_map_name'}else{'unavailable'})
             map_identity_status=$(if($null-ne$identity){[string]$identity.status}else{'unresolved'})
             map_identity_authoritative=$(if($null-ne$identity){[bool]$identity.authoritative}else{$false})
+            complex_action_eligibility=$(if(Get-Command NCA-MapEligibility -ErrorAction SilentlyContinue){NCA-MapEligibility $identity}else{$null})
             replay=$(if(-not [string]::IsNullOrWhiteSpace([string]$j.replay_file)){[string]$j.replay_file}else{$f.BaseName})
             display_name=(Get-ReplayDisplayName $j $f.Name $labels)
             manual_map_name=(Get-ManualMapName $j $f.Name $manualNames)

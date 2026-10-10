@@ -1,5 +1,5 @@
 # QQ飞车录像分析器
-本分支是 [Bowingggg/qqspeed-replay-analyzer](https://github.com/Bowingggg/qqspeed-replay-analyzer) 的独立 fork。已增加 60～67 完整输入时间线、卡气输入候选与衔接量化、共同空间 A/B 比较，以及多参考统计和有条件的时机试验建议。高级技巧仍需回放核对，不输出成功评分或最佳RT。阶段记录：[输入数据](Data/App/docs/stages/0001-input-timeline.md)、[候选量化](Data/App/docs/stages/0002-complex-action-comparison.md)、[参考建议与使用步骤](Data/App/docs/stages/0003-reference-guidance.md)。
+本分支是 [Bowingggg/qqspeed-replay-analyzer](https://github.com/Bowingggg/qqspeed-replay-analyzer) 的独立 fork。已增加 60～67 完整输入时间线、月牙湾卡气输入候选与衔接量化、共同空间 A/B 比较，以及多参考统计和有条件的时机试验建议。卡气功能只开放身份已确认的月牙湾，并要求逐份选择开头练习区域；其他地图保留输入与普通分析。高级技巧仍需回放核对，不输出成功评分或最佳RT。阶段记录：[输入数据](Data/App/docs/stages/0001-input-timeline.md)、[候选量化](Data/App/docs/stages/0002-complex-action-comparison.md)、[参考建议与使用步骤](Data/App/docs/stages/0003-reference-guidance.md)、[验收与月牙湾范围](Data/App/docs/stages/0004-acceptance-and-moon-bay-scope.md)。
 
 把 QQ飞车 `.sav` 录像解析成可核对的分析链：地图身份 → 物理 telemetry → 原生漂移/小喷/动作 → 官方地图几何 → 驾驶分段与 A/B 对比。
 
@@ -33,6 +33,8 @@
 初始化只需做一次，之后每次启动都是空操作。官方资料就绪后不需要任何手工命令。
 
 **系统要求**：Windows 10/11 + Windows PowerShell 5.1 + .NET Framework（均为系统自带）+ 已安装 QQ飞车客户端。不需要 Node.js、Python 或任何第三方运行时。
+
+开发验收可不安装客户端：Fast Gate、合成页面夹具和已有遥测的输入核对均可离线执行。正式首次添加录像所需的官方资料初始化，以及游戏回放逐帧核对，仍需要客户端资源。见[验收说明](Data/App/docs/stages/0004-acceptance-and-moon-bay-scope.md)。
 
 ---
 

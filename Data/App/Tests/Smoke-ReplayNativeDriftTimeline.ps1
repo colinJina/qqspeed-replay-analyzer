@@ -127,7 +127,7 @@ try {
         & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $tele -ReplayPath $bench[0].FullName -OutDir $realOut -ReplaySha256 $realSha -PhysicalCacheDir $realPhysical -Force
         if($LASTEXITCODE-ne0){throw ('Real benchmark telemetry exited '+$LASTEXITCODE)}
         $sum=Get-Content -LiteralPath (Join-Path $realOut 'telemetry_summary.json') -Raw -Encoding UTF8|ConvertFrom-Json
-        if([int]$sum.schema_version-ne19-or[int]$sum.drift_schema_version-ne5-or[int]$sum.lap_schema_version-ne2-or[int]$sum.replay_native_drift_timeline_schema_version-ne4){throw ('Real benchmark schema mismatch: telemetry='+$sum.schema_version+' drift='+$sum.drift_schema_version+' drift_timeline='+$sum.replay_native_drift_timeline_schema_version)}
+        if([int]$sum.schema_version-ne20-or[int]$sum.drift_schema_version-ne5-or[int]$sum.lap_schema_version-ne2-or[int]$sum.replay_native_drift_timeline_schema_version-ne4){throw ('Real benchmark schema mismatch: telemetry='+$sum.schema_version+' drift='+$sum.drift_schema_version+' drift_timeline='+$sum.replay_native_drift_timeline_schema_version)}
         $st=@($sum.streams|Where-Object{[bool]$_.system_drift_state_available}|Sort-Object {[int]$_.system_drift_segment_count} -Descending|Select-Object -First 1)
         if($st.Count-eq0){throw 'Real benchmark did not expose a validated replay-native drift timeline.'}
         if([int]$st[0].system_drift_segment_count-ne36){throw ('Real benchmark expected 36 native drift intervals, got '+$st[0].system_drift_segment_count)}
@@ -137,7 +137,7 @@ try {
         $realStatus='36/36'
     }
     $manifest=Get-Content -LiteralPath (Join-Path $AppDir 'app_manifest.json') -Raw -Encoding UTF8|ConvertFrom-Json
-    if([int]$manifest.data_schemas.telemetry-ne19-or[int]$manifest.data_schemas.drift_state_contract-ne5-or[int]$manifest.data_schemas.lap-ne2-or[int]$manifest.data_schemas.replay_native_drift_timeline-ne4){throw ('Installed manifest no longer exposes the replay-native drift contract: app='+[string]$manifest.app_version)}
+    if([int]$manifest.data_schemas.telemetry-ne20-or[int]$manifest.data_schemas.drift_state_contract-ne5-or[int]$manifest.data_schemas.lap-ne2-or[int]$manifest.data_schemas.replay_native_drift_timeline-ne4){throw ('Installed manifest no longer exposes the replay-native drift contract: app='+[string]$manifest.app_version)}
     Write-Host ('[OK] Replay-Native Drift Timeline v3 smoke passed. app='+[string]$manifest.app_version+' synthetic=3/3 retrigger=absorbed real-month='+$realStatus+' production=marker-or-adjacent-native-pair-authority unmarked-legacy=validated empty-table=authoritative-zero shift=diagnostic-only fallback=none')
     exit 0
 }catch{

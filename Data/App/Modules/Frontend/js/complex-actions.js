@@ -17,11 +17,21 @@
     function node(tag, text) { const n = document.createElement(tag); if (text != null) n.textContent = String(text); return n; }
     function button(text, fn) { const b = node('button', text); b.className = 'btn'; b.onclick = fn; return b; }
     function clear(message) { result = null; batchResult=null;el('guidance').textContent='尚未分析参考组。'; el('rows').replaceChildren(); el('plot').replaceChildren(); el('evidence').textContent = ''; el('export').disabled = true; el('status').textContent = message; }
-    function selection(side) { return focus(state?.[side], el(side === 'subject' ? 'a-start' : 'b-start').value, el(side === 'subject' ? 'a-end' : 'b-end').value); }
+    function applyAvailability() {
+      const disabled=state?.scope?.allowed!==true;
+      for(const field of ['run','run-references','add-reference','add-baseline','reference-choice','a-start','a-end','b-start','b-end'])el(field).disabled=disabled;
+    }
+    function selection(side) {
+      if(!state?.[side])return null;
+      if(state?.scope?.allowed!==true)throw new Error(state?.scope?.message || '卡气分析仅开放已确认地图身份的月牙湾。');
+      const selected=focus(state[side],el(side==='subject'?'a-start':'b-start').value,el(side==='subject'?'a-end':'b-end').value);
+      if(selected.start_t==null || selected.end_t==null || selected.start_t<0)throw new Error('请填写 '+(side==='subject'?'A':'B')+' 开头卡气练习区域的起止时间。');
+      return selected;
+    }
     function holdsText(holds) { return (holds || []).map(h => h.samples + '采样 · ' + number(h.duration_lower_s) + '～' + number(h.duration_upper_s) + 's').join('；') || '—'; }
     function speedText(v) { return v == null ? '—' : speed(v); }
     function clearGuidance() { batchResult=null;el('export').disabled=!result;el('guidance').textContent='参考条件已改变，请重新分析参考组。'; }
-    function invalidateGuidance() {revision++;el('run').disabled=false;el('run-references').disabled=false;clearGuidance();}
+    function invalidateGuidance() {revision++;applyAvailability();clearGuidance();}
     function option(select,value,text) { const o=node('option',text);o.value=String(value);select.appendChild(o); }
     function renderReferenceChoices() {
       el('reference-choice').replaceChildren();
@@ -83,7 +93,7 @@
       const request=++revision;
       try {
         const subject=selection('subject');if(!subject)throw new Error('先选择 A。');if(!references.length)throw new Error('至少添加一份参考。');
-        const selections=references.map(r=>{if(!r.stream||!r.lap)throw new Error('每份参考都需要明确的流和圈次。');return focus({file:r.file,stream:r.stream,lap:r.lap},r.start,r.end);});
+        const selections=references.map(r=>{if(!r.stream||!r.lap)throw new Error('每份参考都需要明确的流和圈次。');const selected=focus({file:r.file,stream:r.stream,lap:r.lap},r.start,r.end);if(selected.start_t==null||selected.end_t==null||selected.start_t<0)throw new Error('每份参考都需要填写开头卡气练习区域的起止时间。');return selected;});
         el('run-references').disabled=true;el('run').disabled=true;clearGuidance();
         // Yield between reference pairs: the loopback server remains available between requests.
         for(let i=0;i<selections.length;i++) {el('guidance').textContent='正在比较参考 '+(i+1)+'/'+selections.length+'…';try{await post('/api/complex-action-comparison',{subject,baseline:selections[i]});}catch(e){/* Batch records per-reference failures. */}if(request!==revision)return;}
@@ -91,7 +101,7 @@
         const declarations={inputs_and_stages_reviewed:!!el('reviewed').checked,same_vehicle_configuration:!!el('same-car').checked,vehicle_configuration_note:el('car-note').value,same_strategy_reviewed:!!el('same-strategy').checked};
         const data=await post('/api/complex-action-batch',{subject,references:selections,declarations});if(request!==revision)return;if(!data?.ok)throw new Error(data?.error || '参考汇总失败');renderGuidance(data);
       }catch(e){if(request===revision)el('guidance').textContent='参考分析失败：'+e.message;}
-      finally{if(request===revision){el('run-references').disabled=false;el('run').disabled=false;}}
+      finally{if(request===revision)applyAvailability();}
     };
     async function evidence(side, stage, reference=null) {
       const request = revision;
@@ -157,14 +167,14 @@
         if (request !== revision) return;
         if (!data?.ok) throw new Error(data?.error || '量化失败'); render(data);
       } catch (e) { if (request === revision) clear('量化失败：' + e.message); }
-      finally { if (request === revision) el('run').disabled = false; }
+      finally { if (request === revision) applyAvailability(); }
     };
     el('export').onclick = () => {
       if (!result && !batchResult) return;
       const url = URL.createObjectURL(new Blob([JSON.stringify(batchResult || result,null,2)],{type:'application/json'})), a = node('a'); a.href=url;a.download='complex-action-measurements.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     function resetReferences(){references=[];batchResult=null;el('run-references').disabled=false;for(const n of ['reviewed','same-car','same-strategy'])el(n).checked=false;el('car-note').value='';renderReferences();renderReferenceChoices();clearGuidance();}
-    return { sync(next) { const nextKey = JSON.stringify(next); if (nextKey === key) return; key=nextKey;state=next;revision++;el('run').disabled=false;for(const name of ['a-start','a-end','b-start','b-end'])el(name).value='';clear('选择已改变，请重新量化。');resetReferences(); }, reset() { key='';state=null;revision++;el('run').disabled=false;clear('尚未量化。');resetReferences(); } };
+    return { sync(next) { const nextKey = JSON.stringify(next); if (nextKey === key) return; key=nextKey;state=next;revision++;for(const name of ['a-start','a-end','b-start','b-end'])el(name).value='';clear(next?.scope?.allowed?'请填写开头卡气练习区域，再量化。':next?.scope?.message || '卡气分析仅开放已确认地图身份的月牙湾。');resetReferences();applyAvailability(); }, reset() { key='';state=null;revision++;clear('尚未量化。');resetReferences();applyAvailability(); } };
   }
   const api = { focus, number, create };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
