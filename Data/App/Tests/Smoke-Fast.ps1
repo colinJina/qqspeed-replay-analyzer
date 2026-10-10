@@ -21,6 +21,8 @@ $tests=@(
     'Smoke-TelemetryFastPipeline.ps1',
     'Smoke-InputTimeline.ps1',
     'Smoke-InputTimelineFrontend.ps1',
+    'Smoke-ComplexActionRoutes.ps1',
+    'Smoke-ComplexActionFrontend.ps1',
     'Smoke-NativeMapModernLayout.ps1',
     'Smoke-PhysicalStreamAliasRejection.ps1',
     'Smoke-NativeEffectLowerBound.ps1',

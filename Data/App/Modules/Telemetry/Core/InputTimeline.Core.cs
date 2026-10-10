@@ -5,6 +5,8 @@ public sealed class QQReplayInputTimelineSample
     public double? delta_ms;
     public double x, y, z;
     public double? speed;
+    public double? distance;
+    public double? forward_heading_rad;
     public int? lap_index;
     public bool pose_valid;
     public bool break_before;
@@ -71,6 +73,8 @@ public static class QQReplayInputTimeline
                 var row=new QQReplayInputTimelineSample(); row.index=rows.Count; row.time_s=t.Value; row.x=x.Value; row.y=y.Value; row.z=z.Value;
                 row.delta_ms=rows.Count==0?(double?)null:(row.time_s-rows[rows.Count-1].time_s)*1000.0;
                 row.speed=Number(Field(raw,columns,"speed")); row.lap_index=Integer(Field(raw,columns,"lap_index"));
+                row.distance=Number(Field(raw,columns,"distance"));
+                row.forward_heading_rad=Number(Field(raw,columns,"vehicle_forward_heading_rad"));
                 string valid=Field(raw,columns,"pose_valid"); row.pose_valid=valid=="" || valid.Equals("true",System.StringComparison.OrdinalIgnoreCase) || valid=="1";
                 string broken=Field(raw,columns,"pose_break_before"); row.break_before=broken.Equals("true",System.StringComparison.OrdinalIgnoreCase) || broken=="1";
                 row.source_stream=Field(raw,columns,"source_stream");

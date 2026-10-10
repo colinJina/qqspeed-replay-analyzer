@@ -41,6 +41,11 @@ const inputTimeline=window.ReplayInputTimeline?window.ReplayInputTimeline.create
   formatSpeed:v=>String(gameSpeedDisplay(v))+' 码',
   onSample:row=>{inputTimelineSample=row;if(analysis)redrawCanvas()}
 }):{sync(){},reset(){}};
+const complexActions=window.ReplayComplexActions?window.ReplayComplexActions.create({
+  panel:$('complexActionsPanel'),post,
+  loadTimeline:s=>json('/api/input-timeline?file='+encodeURIComponent(s.file)+'&stream='+encodeURIComponent(s.stream)+'&lap='+encodeURIComponent(s.lap),{cache:'no-store'}),
+  seek:t=>inputTimeline.seekTime(t),speed:v=>String(gameSpeedDisplay(v))+' 码'
+}):{sync(){},reset(){}};
 
 function fitMapViewportHeight(){
   const wrap=$('mapWrap');if(!wrap)return false;
@@ -158,7 +163,7 @@ async function loadList(keep=''){
   $('count').textContent=records.length;
   renderList();
   const target=keep&&records.some(r=>r.file===keep)?keep:(records[0]?.file||'');
-  if(target)await openRecord(target);else{inputTimeline.reset();$('content').classList.add('hidden');$('empty').classList.remove('hidden')}
+  if(target)await openRecord(target);else{inputTimeline.reset();complexActions.reset();$('content').classList.add('hidden');$('empty').classList.remove('hidden')}
 }
 function renderList(){
   const q=$('search').value.trim().toLowerCase(),box=$('list');box.innerHTML='';
@@ -757,6 +762,7 @@ async function syncCurrentLapToCompare(){
 }
 async function openRecord(file){
   inputTimeline.reset();
+  complexActions.reset();
   currentFile=file;renderList();$('empty').classList.add('hidden');$('content').classList.remove('hidden');
   [analysis,telemetry]=await Promise.all([loadAnalysis(file),loadTelemetry(file)]);stream=localStream(telemetry);
   analysisRevision++;invalidateViewModel();
@@ -860,6 +866,7 @@ function getReferenceTrack(){return ensureViewModel().referenceTrack}
 function redrawCanvas(){const vm=ensureViewModel();drawRoute(vm.referenceTrack,vm.subjectTrack)}
 function renderAll(){
   inputTimeline.sync({file:currentFile,stream:stream?.id,lap:currentLap,revision:analysisRevision});
+  complexActions.sync({subject:currentFile&&stream&&currentLap?{file:currentFile,stream:stream.id,lap:Number(currentLap)}:null,baseline:compareFile&&referenceStream()&&compareLap?{file:compareFile,stream:referenceStream().id,lap:Number(compareLap)}:null,revision:analysisRevision});
   fitMapViewportHeight();
   const vm=ensureViewModel();
   const subjectTrack=vm.subjectTrack,referenceTrack=vm.referenceTrack;

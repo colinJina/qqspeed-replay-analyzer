@@ -199,6 +199,10 @@
     return {
       sync,
       pause,
+      seekTime(t) {
+        pause();
+        if (data?.nondecreasing_time) show(Math.max(0, sampleAt(data.samples, t)));
+      },
       reset() {
         key = "";
         revision++;
